@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------------------
+# Feature engineering configuration
+# ---------------------------------------------------------------------------
+# Unit of analysis: customer. One row per CustomerID.
+# Framework: RFM + Extended Behavioral Features.
+# ---------------------------------------------------------------------------
+
+features:
+  random_seed: 42
+
+  # Customer-level aggregation key
+  customer_key: "CustomerID"
+
+  # Reference date for "Recency" computation.
+  # Either an explicit ISO date or "snapshot_max" (max InvoiceDate + 1 day).
+  reference_date_mode: "snapshot_max"      # snapshot_max | iso_date
+  reference_date_iso: null                # e.g. "2012-01-01" if mode == iso_date
+
+  rfm:
+    enabled: true
+    recency:   { column: "InvoiceDate",  aggregation: "days_since_reference" }
+    frequency: { column: "InvoiceNo",    aggregation: "unique_invoice_count" }
+    monetary:  { column: "LineRevenue",  aggregation: "sum" }
+    output_columns: ["Recency", "Frequency", "Monetary"]
+
+  extended_behavioral:
+    enabled: true
+    # TODO: define each extended feature, its source columns, and aggregation.
+    candidates:
+      - name: "AvgBasketValue"
+        source_columns: ["InvoiceNo", "LineRevenue"]
+        aggregation: "TODO"
+      - name: "UniqueProducts"
+        source_columns: ["StockCode"]
+        aggregation: "TODO"
+      - name: "UniqueInvoices"
+        source_columns: ["InvoiceNo"]
+        aggregation: "TODO"
+      - name: "TotalQuantity"
+        source_columns: ["Quantity"]
+        aggregation: "TODO"
+      - name: "ActiveDays"
+        source_columns: ["InvoiceDate"]
+        aggregation: "TODO"
+      - name: "PurchaseSpan"
+        source_columns: ["InvoiceDate"]
+        aggregation: "TODO"
+      - name: "AvgDaysBetweenPurchases"
+        source_columns: ["InvoiceDate"]
+        aggregation: "TODO"
+
+  validation:
+    enforce_non_negative_monetary: true
+    enforce_unique_customers: true
+    drop_customers_with_na: true
+
+  output:
+    write_processed: true
+    processed_path: "./data/processed/customer_features.parquet"

@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# Experiment configuration
+# ---------------------------------------------------------------------------
+# Drives scripts/run_pipeline.py and docs/experiment_logs/.
+# ---------------------------------------------------------------------------
+
+experiment:
+  name: "TODO_experiment_name"
+  description: "TODO: one-sentence summary of the research question being tested."
+  random_seed: 42
+
+  dataset:
+    role: "primary"               # primary | backup
+    raw_filename: "online_retail.xlsx"
+
+  pipeline_stages:
+    preprocessing: true
+    feature_engineering: true
+    transformation: true
+    clustering: true
+    evaluation: true
+    profiling: true
+    visualization: true
+
+  artifacts:
+    write_interim: true
+    write_processed: true
+    write_reports: true
+    reports_root: "./reports"
+
+  evaluation:
+    internal_metrics: ["silhouette", "calinski_harabasz", "davies_bouldin"]
+    stability:
+      enabled: true
+      n_bootstrap: 30
+      metric: "TODO"              # ari | ami | adjusted_rand
+    runtime:
+      enabled: true
+      repeat: 5
+
+  logging:
+    log_to_console: true
+    log_to_file: true
+    log_file_dir: "./docs/experiment_logs"
+    log_level: "INFO"
+
+  notes: "TODO: free-text notes for this specific experiment run."

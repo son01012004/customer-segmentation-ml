@@ -1,0 +1,136 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+junit/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# Environments
+.env
+.env.local
+.env.*.local
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs and editors
+.cursor/
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+*.log
+logs/
+*.out
+
+# ---------------------------------------------------------------------------
+# Datasets: NEVER committed. Keep directory placeholders (.gitkeep) tracked.
+#
+# Strategy: ignore the whole subtree with `**`, then re-include the
+# placeholder .gitkeep files. We MUST also re-include the intermediate
+# directories, otherwise git's "parent directory is ignored" rule blocks the
+# re-inclusion.
+# ---------------------------------------------------------------------------
+
+# data/raw
+/data/raw/**
+!/data/raw/
+!/data/raw/primary/
+!/data/raw/backup/
+!/data/raw/.gitkeep
+!/data/raw/primary/.gitkeep
+!/data/raw/backup/.gitkeep
+
+# data/interim
+/data/interim/**
+!/data/interim/
+!/data/interim/.gitkeep
+
+# data/processed
+/data/processed/**
+!/data/processed/
+!/data/processed/.gitkeep
+
+# data/external
+/data/external/**
+!/data/external/
+!/data/external/.gitkeep
+
+# Generated reports and figures
+/reports/**
+!/reports/
+!/reports/dataset_audit/
+!/reports/preprocessing/
+!/reports/feature_engineering/
+!/reports/clustering/
+!/reports/evaluation/
+!/reports/figures/
+!/reports/.gitkeep
+!/reports/dataset_audit/.gitkeep
+!/reports/preprocessing/.gitkeep
+!/reports/feature_engineering/.gitkeep
+!/reports/clustering/.gitkeep
+!/reports/evaluation/.gitkeep
+!/reports/figures/.gitkeep
+
+# Local caches
+.cache/
+.mypy_cache/
+.ruff_cache/
+.pyright/
+*.tmp
+*.bak

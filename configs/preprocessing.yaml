@@ -1,0 +1,48 @@
+# ---------------------------------------------------------------------------
+# Preprocessing configuration
+# ---------------------------------------------------------------------------
+# All thresholds and rules are placeholders. Final values will be set
+# after the dataset audit (notebooks/01_dataset_audit).
+# ---------------------------------------------------------------------------
+
+preprocessing:
+  enabled: true
+  random_seed: 42
+
+  # Source dataset (resolved from configs/dataset.yaml)
+  source:
+    role: "primary"            # one of: primary | backup
+    raw_filename: "online_retail.xlsx"
+
+  # Missing values
+  missing_values:
+    strategy: "TODO"           # e.g. drop | impute_median | impute_zero | keep
+    columns: []                # TODO: list columns with explicit policy
+    track_removed_rows: true
+
+  # Duplicate handling
+  duplicates:
+    subset_columns: []         # TODO: e.g. ["InvoiceNo", "StockCode", "InvoiceDate"]
+    keep: "none"               # first | last | none
+    track_removed_rows: true
+
+  # Invalid records (e.g. cancelled invoices, non-positive quantities)
+  invalid_records:
+    drop_cancelled_invoices: true
+    cancellation_prefix: "C"
+    drop_non_positive_quantity: true
+    drop_non_positive_unit_price: true
+    drop_missing_customer_id: true
+
+  # Outlier handling
+  outliers:
+    method: "TODO"             # e.g. iqr | zscore | winsorize
+    columns: []                # TODO: list numeric columns
+    action: "TODO"             # e.g. clip | remove | flag
+    iqr_multiplier: 1.5
+    zscore_threshold: 3.0
+
+  # Output
+  output:
+    write_interim: true
+    interim_path: "./data/interim/transactions_clean.parquet"

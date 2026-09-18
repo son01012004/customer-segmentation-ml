@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------------------
+# Dataset configuration
+# ---------------------------------------------------------------------------
+# Roles here are fixed by the DS-05 decision and must not be changed without
+# a recorded Architecture Decision Record in docs/decisions/.
+#
+# No real dataset statistics are stored here. Only structural metadata.
+# ---------------------------------------------------------------------------
+
+project:
+  name: "customer-segmentation-ml"
+  stage: "DS-05 completed; FE-01 next"
+
+datasets:
+
+  # ----- Primary dataset (used for all reported results) -----
+  primary:
+    role: "primary"
+    name: "UCI Online Retail"
+    expected_raw_directory: "./data/raw/primary"
+    expected_raw_filename: "online_retail.xlsx"        # canonical filename after placement
+    source:
+      provider: "UCI Machine Learning Repository"
+      url: "TODO: add canonical UCI dataset URL"
+      doi: "TODO: add DOI if available"
+    license:
+      type: "TODO: dataset-specific license (e.g. CC BY 4.0)"
+      note: "TODO: confirm redistribution terms before referencing in papers"
+    unit_of_analysis: "customer"
+    description: >
+      TODO: short description of the dataset, time window, country scope,
+      and the columns that will be used downstream.
+
+  # ----- Backup dataset (used only if primary is unavailable) -----
+  backup:
+    role: "backup"
+    name: "UCI Online Retail II"
+    expected_raw_directory: "./data/raw/backup"
+    expected_raw_filename: "online_retail_II.xlsx"
+    source:
+      provider: "UCI Machine Learning Repository"
+      url: "TODO: add canonical UCI dataset URL"
+      doi: "TODO: add DOI if available"
+    license:
+      type: "TODO: dataset-specific license"
+      note: "TODO: confirm redistribution terms before referencing in papers"
+    unit_of_analysis: "customer"
+    description: >
+      TODO: short description of the dataset, time window, country scope,
+      and the columns that will be used downstream.
+
+# Place raw files under the matching directory above.
+# Raw files are NEVER committed to Git (.gitignore rule data/raw/**).
+# Only .gitkeep placeholders are tracked.
