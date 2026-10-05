@@ -162,7 +162,7 @@ def build_cp05_markdown(ctx: Cp05ReportContext) -> str:
         "evidence surface đã được CP-01 → CP-04 (và EXP-05) sản xuất "
         "ra. CP-05 KHÔNG recompute cluster statistics, KHÔNG fit "
         "model, KHÔNG ranking algorithm, KHÔNG đặt tên segment mới, "
-        "KHÔNG marketing recommendation."
+        "KHÔNG đề xuất hoạt động tiếp thị."
     )
     lines.append("")
     lines.append("## 2. Input / Provenance")
@@ -247,7 +247,7 @@ def build_cp05_markdown(ctx: Cp05ReportContext) -> str:
     lines.append("")
     lines.append(
         "Chỉ mô tả dựa trên behavioral feature evidence trong dataset. "
-        "**KHÔNG** suy diễn CLV/LTV/loyalty/churn/retention/purchase "
+        "**KHÔNG** suy diễn LTV (lifetime value)/loyalty/churn/retention/purchase "
         "probability/profitability/customer value/marketing potential."
     )
     lines.append("")
