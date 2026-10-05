@@ -365,26 +365,55 @@ class TestStability:
                 assert r.stability_status in allowed
 
     def test_no_ari_ami_computation(self, exp01_units):
+        """Defensive: CP-05 stability module must NOT compute ARI/AMI/NMI/Hungarian.
+
+        Two layers of defense:
+        1. Module-level attribute scan: no function with
+           ``ari``/``ami``/``nmi``/``hungarian`` in its name is
+           allowed to be exported.
+        2. AST scan of the module source: no ``def`` (top-level or
+           nested) is allowed to have one of those tokens in its name.
+
+        The previous implementation relied on a fragile substring
+        search of the source file, which incorrectly matched the
+        module docstring's "KHÔNG compute ARI / AMI / NMI" sentence.
+        """
+        import ast
         import inspect
 
         from customer_segmentation.profiling.cp05 import stability as stab_module
 
-        source = inspect.getsource(stab_module)
-        assert (
-            "compute"
-            not in source.lower()
-            .replace("compute_ari", "COMPUTE")
-            .replace("compute_ami", "COMPUTE")
-            or "ari" not in source.lower()
-            and "ami" not in source.lower()
-        )
-        # Explicitly check that no ARI/AMI computation functions exist.
+        # Layer 1: exported attribute scan.
         forbidden_funcs = [
             name
             for name in dir(stab_module)
-            if "ari" in name.lower() or "ami" in name.lower() or "nmi" in name.lower()
+            if any(
+                token in name.lower()
+                for token in ("ari", "ami", "nmi", "hungarian")
+            )
         ]
-        assert not forbidden_funcs, f"Forbidden functions: {forbidden_funcs}"
+        assert not forbidden_funcs, (
+            f"Forbidden ARI/AMI/NMI/Hungarian function names exported: "
+            f"{forbidden_funcs}"
+        )
+
+        # Layer 2: AST scan of the source for any function definition
+        # whose name contains ARI/AMI/NMI/Hungarian.
+        source = inspect.getsource(stab_module)
+        tree = ast.parse(source)
+        forbidden_defs: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                func_name_lc = node.name.lower()
+                if any(
+                    token in func_name_lc
+                    for token in ("ari", "ami", "nmi", "hungarian")
+                ):
+                    forbidden_defs.append(node.name)
+        assert not forbidden_defs, (
+            f"Forbidden ARI/AMI/NMI/Hungarian function definitions: "
+            f"{forbidden_defs}"
+        )
 
     def test_segment_level_stability_note_present(self, exp01_units):
         for unit in exp01_units:
@@ -559,6 +588,19 @@ class TestFinalDefinition:
 
 class TestCp04Consistency:
     def test_cluster_ids_match_cp04(self, exp01_units):
+        # Two invariants are checked separately:
+        # 1. For ALL exp01 units: cluster_id consistency between
+        #    size_df and the three evaluators that return per-cluster
+        #    rows. Distinctiveness excludes the DBSCAN noise bucket
+        #    (``-1``), which is correct per CP-05 plan.
+        # 2. The presence of the noise bucket (``-1``) in size_df /
+        #    interpretability / size-evaluation is a DBSCAN-specific
+        #    invariant — only DBSCAN produces a noise bucket because
+        #    it is the only density-based algorithm in the benchmark
+        #    set. K-Means / Agglomerative / GMM / Fuzzy C-Means do
+        #    NOT have a ``-1`` cluster_id, and the previous version
+        #    of this test incorrectly asserted ``-1 in cluster_ids``
+        #    for every unit.
         for unit in exp01_units:
             bundle = load_cp04_evidence_for_unit(
                 unit, cp01_dir=CP01_DIR, cp02_dir=CP02_DIR, cp03_dir=CP03_DIR, cp04_dir=CP04_DIR
@@ -567,18 +609,39 @@ class TestCp04Consistency:
             interp = evaluate_interpretability(bundle)
             size = evaluate_size(bundle)
             cluster_ids_size = {int(c) for c in bundle.size_df["cluster_id"].tolist()}
-            # Distinctiveness excludes noise (correct per plan).
             cluster_ids_distinct = {r.cluster_id for r in distinct}
             cluster_ids_interp = {r.cluster_id for r in interp}
             cluster_ids_size_res = {r.cluster_id for r in size}
-            # All except distinct must include noise -1.
-            assert -1 in cluster_ids_size
-            assert -1 in cluster_ids_interp
-            assert -1 in cluster_ids_size_res
+            # size_df / interpretability / size-evaluation must agree
+            # on the cluster_id set.
             assert cluster_ids_size == cluster_ids_interp
             assert cluster_ids_size == cluster_ids_size_res
-            # Distinct: subset of size (no noise).
+            # Distinctiveness excludes the noise bucket.
             assert cluster_ids_distinct.issubset(cluster_ids_size - {-1})
+
+        # Invariant 2: only DBSCAN has a noise bucket (-1).
+        dbscan_units = [u for u in exp01_units if u.algorithm == "dbscan"]
+        assert dbscan_units, "Expected at least one DBSCAN exp01 unit"
+        for dbscan_unit in dbscan_units:
+            bundle = load_cp04_evidence_for_unit(
+                dbscan_unit,
+                cp01_dir=CP01_DIR,
+                cp02_dir=CP02_DIR,
+                cp03_dir=CP03_DIR,
+                cp04_dir=CP04_DIR,
+            )
+            cluster_ids_size = {int(c) for c in bundle.size_df["cluster_id"].tolist()}
+            cluster_ids_interp = {
+                r.cluster_id for r in evaluate_interpretability(bundle)
+            }
+            cluster_ids_size_res = {
+                r.cluster_id for r in evaluate_size(bundle)
+            }
+            assert -1 in cluster_ids_size, (
+                f"DBSCAN unit {dbscan_unit.unit_id} must include noise bucket -1"
+            )
+            assert -1 in cluster_ids_interp
+            assert -1 in cluster_ids_size_res
 
     def test_segment_names_inherit_from_cp04(self, exp01_units):
         for unit in exp01_units:
@@ -731,7 +794,19 @@ class TestRunner:
         assert "input_shas" in manifest
         assert "output_shas" in manifest
         assert manifest["n_units"] == 10
-        assert manifest["n_definitions"] >= 39
+        # 10 analysis units = 5 EXP-01 + 5 EXP-03.
+        # EXP-01 contributes segment definitions equal to its cluster
+        # count (4 + 4 + 18 + 4 + 4 = 34, where the DBSCAN 18 includes
+        # the noise bucket ``-1``). EXP-03 units have
+        # ``labels_persisted=False`` per the CP-05 plan, which means
+        # ``size_df`` is empty and they contribute ZERO segment
+        # definitions (the ``interpretation_readiness`` for EXP-03
+        # rows is ``NOT_ASSESSABLE``). The previous expectation of
+        # ``>= 39`` was written when EXP-03 was assumed to contribute
+        # segment rows; this was incorrect under the actual CP-05
+        # methodology where EXP-03 is documented in §12 of the
+        # report as NOT_AVAILABLE.
+        assert manifest["n_definitions"] == 34
 
     def test_runner_no_exp03(self, tmp_path):
         runner = Cp05Runner(output_dir=tmp_path, include_exp03=False)
