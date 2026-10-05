@@ -15,10 +15,19 @@ benchmarking protocol must be:
 
 ## Current documents
 
-- `TODO_research_questions.md` — research questions (to be added).
-- `TODO_methodology_overview.md` — pipeline and benchmarking protocol
-  (to be added).
-- `TODO_unit_of_analysis.md` — unit of analysis rationale (to be added).
+| File | Status | Description |
+|------|--------|-------------|
+| `research_questions.md` | ✅ ACTIVE | RQ1, RQ2, RQ3 official definitions |
+| `methodology_overview.md` | ✅ ACTIVE | Study design, benchmarking protocol, experiment pipeline |
+| `TODO_unit_of_analysis.md` | ⏳ PENDING | Unit of analysis rationale (to be added if needed) |
 
-The placeholder files in this directory track the methodology structure
-even before the real documents are written.
+## Key decisions (ADRs)
+
+| ADR | Decision |
+|-----|----------|
+| ADR-0001 | Primary dataset = UCI Online Retail |
+| ADR-0002 | Backup dataset = UCI Online Retail II |
+| ADR-0003 | Algorithm scope = 5 algorithms (K-Medoids OUT OF SCOPE) |
+| ADR-0004 | Research Questions RQ1, RQ2, RQ3 definitions |
+
+See [`../decisions/`](docs/decisions/) for full ADR text.

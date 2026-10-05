@@ -1,0 +1,536 @@
+# ---------------------------------------------------------------------------
+# EXP-03 — Hyperparameter Search Configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the EXP-03 hyperparameter search experiment.
+# Not used by EPIC-06 framework, EXP-01 baseline, or EXP-02 K-sweep.
+#
+# EXP-03 scope:
+#   - Xác định search space có căn cứ cho từng clustering algorithm.
+#   - Khảo sát ảnh hưởng của hyperparameters (single-parameter sensitivity).
+#   - Chạy controlled hyperparameter experiments.
+#   - Lưu toàn bộ search results + sensitivity evidence.
+#   - Xác định working selected configuration trong phạm vi từng algorithm
+#     dựa trên multi-metric evidence (NO algorithm ranking).
+#
+# EXP-03 does NOT:
+#   - Rank algorithms.
+#   - Pick "best algorithm" / "winning algorithm" / "final algorithm".
+#   - Pick "best K" (K is taken from EXP-02 candidates, not re-swept).
+#   - Stability analysis (EXP-05 / EPIC-08 scope).
+#   - Customer profiling (EPIC-09 scope).
+#   - Business interpretation.
+#   - Auto-create composite scoring with arbitrary weights.
+#
+# Pipeline boundary:
+#   - Reuses EXP-01 metrics layer (silhouette, DBI, CH, WCSS) verbatim.
+#   - Reuses ML-01 ExperimentRunner for per-run execution.
+#   - Reuses ClusterResult / ExperimentResult schema unchanged.
+#   - Does NOT mutate FE-06 input dataset or customer metadata.
+# ---------------------------------------------------------------------------
+
+exp03:
+  name: "EXP-03 Hyperparameter Search"
+  description: >
+    Controlled hyperparameter sensitivity sweep for the five EPIC-06
+    benchmark algorithms. K (n_clusters / n_components) is reused
+    from EXP-02 candidate set (controlled reuse of EXP-02 evidence);
+    EXP-03 focuses on non-K hyperparameters (init, n_init, max_iter,
+    linkage, eps, min_samples, covariance_type, init_params, m,
+    fuzziness, ...). Each parameter sweep is single-parameter at a
+    time, holding the others at the EXP-01 working defaults. The
+    output is per-algorithm working selected configuration, NEVER a
+    cross-algorithm ranking.
+
+  # -----------------------------------------------------------------------
+  # Dataset identity (read-only)
+  # -----------------------------------------------------------------------
+  dataset:
+    version: "FE06-v1.0"
+    final_clustering_dataset_path: "./data/processed/final_clustering_dataset.parquet"
+    customer_metadata_path: "./data/processed/customer_metadata.parquet"
+    customer_key: "CustomerID"
+
+  # -----------------------------------------------------------------------
+  # Feature set
+  # -----------------------------------------------------------------------
+  # PENDING_REVIEW (EXP03-FS-01): Repo currently exposes FE-06 final
+  # clustering dataset only as the full Extended RFM (14-feature)
+  # matrix. No RFM-only parquet artifact is present in the repository.
+  # EXP-03 therefore runs on the Extended RFM feature set only.
+  feature_sets:
+    - name: "rfm_extended"
+      description: >
+        Full FE-06 final clustering matrix (14 features). This is the
+        SINGLE feature set EXP-03 currently has access to. RFM-only
+        feature set NOT present in repo (PENDING_REVIEW — see EXP03-FS-01).
+      run_search: true
+
+  # -----------------------------------------------------------------------
+  # Algorithm participation
+  # -----------------------------------------------------------------------
+  # Canonical order: kmeans, agglomerative, dbscan, gmm, fuzzy_cmeans.
+  algorithms:
+    - name: "kmeans"
+      family: "hard"
+      has_k: true
+      k_param: "n_clusters"
+      baseline_k: 4
+      candidate_k_source: "exp02_candidates_kmeans"
+    - name: "agglomerative"
+      family: "hard"
+      has_k: true
+      k_param: "n_clusters"
+      baseline_k: 4
+      candidate_k_source: "exp02_candidates_agglomerative"
+    - name: "dbscan"
+      family: "density_based"
+      has_k: false
+      k_param: null
+      baseline_k: null
+      candidate_k_source: null
+    - name: "gmm"
+      family: "model_based"
+      has_k: true
+      k_param: "n_components"
+      baseline_k: 4
+      candidate_k_source: "exp02_candidates_gmm"
+    - name: "fuzzy_cmeans"
+      family: "fuzzy"
+      has_k: true
+      k_param: "n_clusters"
+      baseline_k: 4
+      candidate_k_source: "exp02_candidates_fuzzy_cmeans"
+
+  # -----------------------------------------------------------------------
+  # Search strategy
+  # -----------------------------------------------------------------------
+  # Three stages:
+  #   Stage A — Baseline: re-affirm EXP-01 working defaults as the
+  #     reference configuration. ONE run per algorithm (the baseline_K
+  #     with all working default non-K hyperparameters).
+  #   Stage B — Single-parameter sensitivity: vary ONE hyperparameter
+  #     at a time, holding all others at the Stage A baseline. Each
+  #     parameter sweep has its own explicit candidate values.
+  #   Stage C — Selected interactions: a small set of (K, parameter)
+  #     combinations to assess parameter × K interaction, drawn from
+  #     EXP-02 candidate K × Stage B parameter values.
+  search_strategy:
+    stages:
+      - id: "A"
+        name: "Baseline"
+        description: >
+          Single baseline run per algorithm at baseline_K with EXP-01
+          working defaults. Provides the reference point for the
+          sensitivity analysis.
+      - id: "B"
+        name: "Single-parameter sensitivity"
+        description: >
+          For each algorithm × parameter × value, vary ONE
+          hyperparameter at a time. All other parameters held at the
+          Stage A baseline. Generates parameter sensitivity evidence.
+      - id: "C"
+        name: "Selected interactions"
+        description: >
+          A small set of (K, parameter) combinations drawn from
+          EXP-02 candidate K and Stage B parameter values. Documents
+          K × parameter interaction evidence.
+
+  # -----------------------------------------------------------------------
+  # K-candidate reuse from EXP-02 (controlled reuse)
+  # -----------------------------------------------------------------------
+  # EXP-03 does NOT re-sweep K = 2..10. K candidates come from EXP-02
+  # results (exp02_candidate_cluster_numbers.csv). This is documented
+  # as "controlled reuse of EXP-02 evidence".
+  k_reuse_from_exp02:
+    enabled: true
+    source_path: "./reports/exp02/exp02_candidate_cluster_numbers.csv"
+    rationale: >
+      Reusing EXP-02 candidate K avoids redundant K=2..10 sweep and
+      focuses EXP-03 on the non-K hyperparameters. Each K is paired
+      with Stage A baseline hyperparameters for interaction runs.
+    status: "CONTROLLED_REUSE_OF_EXP02_EVIDENCE"
+
+  # -----------------------------------------------------------------------
+  # Per-algorithm search space
+  # -----------------------------------------------------------------------
+  # Each non-K parameter has a candidate_values list. Stage B will
+  # generate (baseline_value + candidate_values) runs for that
+  # parameter, with all other parameters held at Stage A baseline.
+  # PENDING_REVIEW (EXP03-SP-01): candidate value rationale and
+  # decision status.
+  search_space:
+
+    # ---------------- K-MEANS ----------------
+    kmeans:
+      baseline_k: 4
+      fixed_parameters:
+        tol: 1.0e-4
+      parameter_sweeps:
+        - parameter: "init"
+          candidate_values: ["k-means++", "random"]
+          baseline_value: "k-means++"
+          rationale: >
+            k-means++ is sklearn default since 1.1; 'random' is the
+            legacy baseline. EXP-03 sweeps both to quantify the effect
+            of initialization strategy.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+        - parameter: "n_init"
+          candidate_values: [1, 5, 10, 20]
+          baseline_value: 10
+          rationale: >
+            sklearn recommends n_init >= 10 for k-means++. Lower
+            values (1, 5) expose single-run variance; higher (20)
+            confirms stability. EXP-03 sweeps these to quantify
+            variance vs cost.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+        - parameter: "max_iter"
+          candidate_values: [100, 300, 500]
+          baseline_value: 300
+          rationale: >
+            300 is sklearn default and EXP-01 working default.
+            100 = aggressive early-stop; 500 = upper bound for typical
+            convergence. Sweep to confirm convergence behaviour.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+
+    # ---------------- AGGLOMERATIVE ----------------
+    agglomerative:
+      baseline_k: 4
+      fixed_parameters:
+        metric: "euclidean"
+        compute_distances: true
+      parameter_sweeps:
+        - parameter: "linkage"
+          # All 4 sklearn-supported linkages for the (linkage, metric)
+          # grid below. ward + euclidean is the only ward constraint.
+          candidate_values: ["ward", "complete", "average", "single"]
+          baseline_value: "ward"
+          rationale: >
+            sklearn supports 4 linkage criteria: ward (Euclidean only,
+            minimizes within-cluster variance), complete (max pairwise
+            distance, tends to compact clusters), average (mean pairwise
+            distance, compromise), single (min pairwise distance,
+            chains). EXP-03 sweeps all four for sensitivity evidence.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+
+    # ---------------- DBSCAN ----------------
+    dbscan:
+      baseline_k: null  # DBSCAN has no K
+      fixed_parameters:
+        metric: "euclidean"
+      parameter_sweeps:
+        - parameter: "eps"
+          candidate_values: [0.3, 0.5, 0.7, 1.0]
+          baseline_value: 0.5
+          rationale: >
+            eps is the neighborhood radius. 0.5 is the EXP-01
+            baseline. 0.3 is more conservative (denser core
+            requirement); 0.7, 1.0 are more permissive (larger
+            neighborhoods). Sweep to quantify cluster count and
+            noise ratio response.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+        - parameter: "min_samples"
+          candidate_values: [3, 5, 10, 15]
+          baseline_value: 5
+          rationale: >
+            min_samples is the minimum points per core neighborhood.
+            5 is the EXP-01 baseline. 3 is more permissive (small
+            clusters); 10, 15 are more conservative (larger clusters,
+            more noise expected).
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+
+    # ---------------- GMM ----------------
+    gmm:
+      baseline_k: 4
+      fixed_parameters:
+        tol: 1.0e-3
+        reg_covar: 1.0e-6
+        max_iter: 100
+        n_init: 1
+      parameter_sweeps:
+        - parameter: "covariance_type"
+          candidate_values: ["full", "tied", "diag", "spherical"]
+          baseline_value: "full"
+          rationale: >
+            sklearn supports 4 covariance types: full (most flexible,
+            n*p*(p+1)/2 parameters per component), tied (shared
+            covariance, intermediate), diag (diagonal only, no
+            correlation), spherical (single variance scalar per
+            component, fewest params). Sweep to quantify
+            flexibility/regularization trade-off.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+        - parameter: "init_params"
+          candidate_values: ["kmeans", "random"]
+          baseline_value: "kmeans"
+          rationale: >
+            sklearn supports 2 initialization strategies: kmeans
+            (default, uses K-Means init) and random (Dirichlet + 
+            Gaussian samples). Sweep to quantify init sensitivity.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+
+    # ---------------- FUZZY C-MEANS ----------------
+    fuzzy_cmeans:
+      baseline_k: 4
+      fixed_parameters:
+        error: 1.0e-4
+      parameter_sweeps:
+        - parameter: "m"
+          candidate_values: [1.5, 2.0, 2.5, 3.0]
+          baseline_value: 2.0
+          rationale: >
+            Fuzziness parameter m. m=2 is the canonical Bezdek
+            default; 1.5 is closer to hard clustering; 2.5, 3.0
+            are softer (larger exponent = more fuzziness). Sweep
+            to quantify fuzziness sensitivity. Must be > 1.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+        - parameter: "max_iter"
+          candidate_values: [100, 300, 500]
+          baseline_value: 300
+          rationale: >
+            Maximum FCM iterations. 300 is the EXP-01 baseline.
+            100 = early-stop; 500 = extended convergence. Sweep to
+            confirm convergence behaviour.
+          status: "WORKING_ASSUMPTION"
+          decision_status: "WORKING_ASSUMPTION"
+
+  # -----------------------------------------------------------------------
+  # Stage C — Selected interactions (K × parameter)
+  # -----------------------------------------------------------------------
+  # A SMALL set of (K, parameter) combinations drawn from EXP-02
+  # candidate K and Stage B parameter values. Purpose: document
+  # K × parameter interaction evidence.
+  # PENDING_REVIEW (EXP03-INT-01): interaction scope and rationale.
+  selected_interactions:
+    # K-Means at K=3 (EXP-02 candidate) × n_init variations
+    - algorithm: "kmeans"
+      K: 3
+      parameters:
+        n_init: [1, 10, 20]
+      rationale: >
+        K=3 is one of EXP-02 K-Means candidates (strong agreement=4).
+        Sweep n_init at this K to see if K × n_init interaction differs
+        from baseline K=4.
+    # Agglomerative at K=3 (EXP-02 candidate) × linkage variation
+    - algorithm: "agglomerative"
+      K: 3
+      parameters:
+        linkage: ["ward", "complete", "average"]
+      rationale: >
+        K=3 is one of EXP-02 Agglomerative candidates (strong
+        agreement=4). Sweep linkage at this K to see if
+        K × linkage interaction differs from baseline K=4.
+    # FCM at K=3 (EXP-02 candidate) × m variation
+    - algorithm: "fuzzy_cmeans"
+      K: 3
+      parameters:
+        m: [1.5, 2.0, 2.5]
+      rationale: >
+        K=3 is one of EXP-02 FCM candidates (strong agreement=4).
+        Sweep m at this K to see if K × m interaction differs from
+        baseline K=4.
+
+  # -----------------------------------------------------------------------
+  # Runtime protocol (mirror EXP-01 / EXP-02)
+  # -----------------------------------------------------------------------
+  runtime:
+    repeat: 5
+    seed: 42
+    note: >
+      Algorithm execution runtime only. Metric computation and
+      artifact/report writing are excluded from runtime stats.
+
+  # -----------------------------------------------------------------------
+  # Metrics (re-uses EXP-01 metrics layer)
+  # -----------------------------------------------------------------------
+  metrics:
+    internal:
+      - silhouette
+      - davies_bouldin
+      - calinski_harabasz
+      - wcss
+    status_policy: "exp01_mirror"
+    wcss_centroid: "arithmetic_hard_labels"
+
+  # -----------------------------------------------------------------------
+  # Selection protocol (multi-metric, transparent)
+  # -----------------------------------------------------------------------
+  # EXP-03 must NOT pick a configuration by a single metric. The
+  # selection protocol below is transparent and reproducible:
+  #
+  #   Step 1: For each algorithm, restrict to Stage A + Stage B +
+  #     Stage C runs whose status = SUCCESS and all metrics have
+  #     status = VALID_VALUE.
+  #   Step 2: For each algorithm, compute a per-configuration
+  #     "evidence" snapshot:
+  #       - silhouette_value, silhouette_rank (higher is better)
+  #       - dbi_value, dbi_rank (lower is better)
+  #       - ch_value, ch_rank (higher is better)
+  #       - wcss_value (lower is better; elbow-context, NOT ranking
+  #         criterion on its own)
+  #       - runtime_mean (lower is better; diagnostic only, NOT
+  #         primary criterion)
+  #   Step 3: For each algorithm, select a "working selected
+  #     configuration" by the following deterministic rule:
+  #       - Among configurations whose hyperparameters match the
+  #         baseline K (n_clusters or n_components) for the
+  #         algorithm, restrict to those whose metrics are all
+  #         VALID_VALUE.
+  #       - Among those, find the configuration(s) with the highest
+  #         silhouette rank (best).
+  #       - If exactly one configuration has the highest silhouette
+  #         rank, that is the working selected configuration.
+  #       - If multiple configurations tie on silhouette rank,
+  #         break ties by DBI rank (lower DBI rank is better).
+  #       - If still tied, break by CH rank (higher is better).
+  #       - If still tied, all tied configurations are listed as
+  #         "selected candidates" with status WORKING_SELECTED,
+  #         and the report documents the tie.
+  #   Step 4: Document "disagreement" — when different criteria
+  #     would pick different configurations, the disagreement is
+  #     recorded (NO composite score with arbitrary weights).
+  #
+  # This protocol does NOT use composite scoring, does NOT weight
+  # metrics arbitrarily, and does NOT rank algorithms across
+  # families. Each algorithm gets its own working selected
+  # configuration. The output is per-algorithm, NEVER cross-algorithm.
+  selection_protocol:
+    primary_criterion: "silhouette"
+    tie_breaker_1: "davies_bouldin"  # lower is better
+    tie_breaker_2: "calinski_harabasz"  # higher is better
+    diagnostics_only:
+      - "wcss"  # observed; not used as primary criterion
+      - "runtime"  # observed; not used as primary criterion
+    output_label: "WORKING_SELECTED"
+    pending_review_label: "PENDING_REVIEW"
+    decision_status_options:
+      - "WORKING_SELECTED"  # single configuration selected by protocol
+      - "TIED_WORKING_SELECTED"  # multiple configurations tied
+      - "PENDING_REVIEW"  # protocol not applied (e.g., insufficient data)
+    forbidden_labels:
+      - "best"  # NEVER use as a label
+      - "winner"  # NEVER
+      - "optimal"  # NEVER
+      - "final"  # NEVER
+      - "recommended"  # NEVER
+      - "superior"  # NEVER
+    status: "WORKING_ASSUMPTION"
+
+  # -----------------------------------------------------------------------
+  # Output
+  # -----------------------------------------------------------------------
+  output:
+    reports_dir: "./reports/exp03"
+    figures_dir: "./reports/exp03/figures"
+    canonical_algorithm_order:
+      - kmeans
+      - agglomerative
+      - dbscan
+      - gmm
+      - fuzzy_cmeans
+
+  # -----------------------------------------------------------------------
+  # Decision status
+  # -----------------------------------------------------------------------
+  decision_status:
+    search_space: "WORKING_ASSUMPTION"
+    selection_protocol: "WORKING_ASSUMPTION"
+    k_reuse_strategy: "CONTROLLED_REUSE_OF_EXP02_EVIDENCE"
+    feature_set_coverage: "ONLY_RFM_EXTENDED"
+    next_stage_owner: "EPIC-08"
+    # Finalize status (after research review, 2026-09-21):
+    # - selection_protocol kept as WORKING_ASSUMPTION per mentor decision.
+    # - K-Means tie kept as TIED_WORKING_SELECTED; not resolved to a
+    #   single configuration.
+    # - Agglomerative selected kept as WORKING_SELECTED but explicitly
+    #   flagged via EXP03-SEL-02 as having known silhouette-vs-CH
+    #   disagreement; MUST NOT be promoted to "final" before EPIC-08
+    #   cross-metric evaluation and stability analysis.
+    finalize_after_research_review: "TECHNICALLY_IMPLEMENTED_WITH_RESEARCH_DECISIONS_PENDING"
+    agglomerative_selection_disagreement: "EXP03-SEL-02_PENDING_EPIC-08_RESOLUTION"
+    kmeans_tie_resolution: "TIED_WORKING_SELECTED_PRESERVED"
+
+  # -----------------------------------------------------------------------
+  # PENDING_REVIEW notes
+  # -----------------------------------------------------------------------
+  pending_review_notes:
+    - "EXP03-SP-01: Search space per-algorithm candidate values are WORKING_ASSUMPTION."
+    - "EXP03-FS-01: RFM-only feature set NOT present in repo; EXP-03 runs on RFM Extended only."
+    - "EXP03-K-01: K candidates reused from EXP-02 (controlled reuse of EXP-02 evidence). NOT re-swept."
+    - "EXP03-INT-01: Selected interactions are a SMALL curated subset of K × parameter combinations."
+    - "EXP03-SEL-01: Selection protocol uses silhouette (primary), DBI (tiebreaker 1), CH (tiebreaker 2). Kept as WORKING_ASSUMPTION per mentor decision."
+    - "EXP03-SEL-02: Agglomerative selected (Stage C K=3 linkage=average, silhouette=0.8033, CH=77.15) has strong silhouette-vs-CH disagreement (CH ~60x lower than alternatives 1701-5029). Known artifact of average-linkage chaining. Kept as WORKING_SELECTED by EXP-03 protocol but NOT promoted to final validated configuration. EPIC-08 MUST perform cross-metric evaluation and stability analysis before any research conclusion uses this configuration."
+    - "EXP03-KM-01: K-Means Stage C (K=3, n_init=1/10/20) is a genuine 3-way tie (silhouette, DBI, CH, WCSS all numerically identical to 17 decimal places). Kept as TIED_WORKING_SELECTED with 2 tied alternates. NOT forced to a single configuration. Resolved at EPIC-08."
+    - "EXP03-METRIC-01: Metric status semantics mirror EXP-01 (no new metric introduced)."
+    - "EXP03-REPRO-01: Same seed across all repetitions; this is NOT stability analysis."
+
+  assumptions:
+    - "FE-06 final clustering matrix is READ-ONLY during EXP-03."
+    - "CustomerID is in metadata only; the matrix never contains identifiers."
+    - "EXP-01 working defaults are accepted as WORKING_ASSUMPTION (mirrored by EXP-03 Stage A baseline)."
+    - "EXP-02 candidate K is reused; EXP-03 focuses on non-K hyperparameters."
+    - "DBSCAN: eps / min_samples sweeps are documented separately; no K applied."
+    - "Random seed = 42, n_repeat = 5 (mirrors EXP-01 / EXP-02)."
+    - "Single-parameter sweeps: vary ONE parameter at a time, others at baseline."
+
+  scope_boundaries:
+    - "Single-parameter sensitivity sweeps (Stage B) for each algorithm."
+    - "Three selected interaction runs (Stage C) using EXP-02 candidate K."
+    - "Stage A baseline re-asserts EXP-01 working defaults."
+    - "Selection protocol is per-algorithm, NOT cross-algorithm."
+    - "Metric layer is the EXP-01 metrics.py layer — reused verbatim."
+    - "WCSS uses arithmetic centroid from hard labels."
+    - "DBSCAN noise handling follows EXP-01 (exclude noise from internal metrics and WCSS)."
+    - "Random seed protocol mirrors EXP-01 (single seed 42 across n_repeat)."
+
+# ---------------------------------------------------------------------------
+# Working defaults per algorithm (mirror EXP-01 / configs/exp01_baseline.yaml)
+# ---------------------------------------------------------------------------
+# These are WORKING_ASSUMPTIONS, not final approved methodology.
+# They are sourced from configs/exp01_baseline.yaml working_defaults.
+# Stage A baseline uses these values; Stage B sweeps override specific
+# parameters while keeping others at these defaults.
+# ---------------------------------------------------------------------------
+
+working_defaults:
+
+  kmeans:
+    n_clusters: 4
+    init: "k-means++"
+    n_init: 10
+    max_iter: 300
+    tol: 1.0e-4
+
+  agglomerative:
+    n_clusters: 4
+    linkage: "ward"
+    metric: "euclidean"
+    compute_distances: true
+
+  dbscan:
+    eps: 0.5
+    min_samples: 5
+    metric: "euclidean"
+
+  gmm:
+    n_components: 4
+    covariance_type: "full"
+    init_params: "kmeans"
+    tol: 1.0e-3
+    reg_covar: 1.0e-6
+    max_iter: 100
+    n_init: 1
+
+  fuzzy_cmeans:
+    n_clusters: 4
+    m: 2.0
+    max_iter: 300
+    error: 1.0e-4

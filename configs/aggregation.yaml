@@ -1,0 +1,183 @@
+# ---------------------------------------------------------------------------
+# FE-04 Aggregation configuration — customer-level base dataset
+# ---------------------------------------------------------------------------
+#
+# Single source of truth cho FE-04 customer aggregation pipeline.
+# Doc: ``scripts/run_fe04_aggregation.py`` docstring.
+#
+# Status markers:
+#   WORKING_ASSUMPTION      - Baseline aggregation; reversible; FE-05
+#                              có thể review và điều chỉnh.
+#   PENDING_MENTOR_REVIEW   - Decision thuộc về mentor; không được
+#                              tự ý adopt mà không có mentor approval.
+#
+# Hard constraints (AGENTS.md):
+# - Input: data/processed/transactions_clean.parquet (FE-02 output).
+# - Output: data/processed/customer_base.parquet.
+# - SHA-256 của input được ghi nhận trong fe04_run.json.
+# - Không clustering, không feature selection, không scaling.
+# ---------------------------------------------------------------------------
+
+aggregation:
+  enabled: true
+  random_seed: 42
+
+  # ---------------------------------------------------------------
+  # Source dataset
+  # ---------------------------------------------------------------
+  source:
+    role: "primary"
+    cleaned_dataset_path: "./data/processed/transactions_clean.parquet"
+    raw_dataset_path: "./data/raw/primary/Online Retail.xlsx"
+
+  # ---------------------------------------------------------------
+  # Aggregation specifications
+  # ---------------------------------------------------------------
+  # Mỗi feature có:
+  #   name          : tên cột trong output
+  #   source        : tên cột nguồn (hoặc "LineRevenue" cho derived)
+  #   fn            : aggregation function
+  #   status        : WORKING_ASSUMPTION | PENDING_MENTOR_REVIEW
+  #   description   : giải thích business meaning (dùng cho report)
+  #
+  # Aggregation functions được support:
+  #   sum            - tổng (Quantity, LineRevenue)
+  #   nunique        - số giá trị duy nhất (InvoiceNo, StockCode)
+  #   min            - giá trị nhỏ nhất (InvoiceDate)
+  #   max            - giá trị lớn nhất (InvoiceDate)
+  #   count          - số dòng (transaction-line count)
+  #   nunique_date   - số ngày duy nhất (từ InvoiceDate)
+  #
+  # Conditional aggregations (cancellation/return):
+  #   prefix "conditional:" + filter + ":" + fn
+  #   Ví dụ: conditional:IsCancellation==True:nunique(InvoiceNo)
+  # ---------------------------------------------------------------
+  aggregations:
+
+    - name: "TotalQuantity"
+      source: "Quantity"
+      fn: "sum"
+      status: "WORKING_ASSUMPTION"
+      description: "Tổng số lượng sản phẩm của khách hàng."
+
+    - name: "TotalMonetary"
+      source: "LineRevenue"
+      fn: "sum"
+      status: "WORKING_ASSUMPTION"
+      description: >
+        Tổng doanh thu theo signed baseline (Quantity × UnitPrice).
+        Giữ signed value; cancellation/return rows tạo giá trị âm.
+        Đây là baseline — FE-05 sẽ review sign convention cho RFM Monetary.
+
+    - name: "FirstPurchaseDate"
+      source: "InvoiceDate"
+      fn: "min"
+      status: "WORKING_ASSUMPTION"
+      description: "Ngày giao dịch đầu tiên của khách hàng."
+
+    - name: "LastPurchaseDate"
+      source: "InvoiceDate"
+      fn: "max"
+      status: "WORKING_ASSUMPTION"
+      description: "Ngày giao dịch cuối cùng của khách hàng."
+
+    - name: "PurchaseFrequency"
+      source: "InvoiceNo"
+      fn: "nunique"
+      status: "WORKING_ASSUMPTION"
+      description: >
+        Working proxy cho tần suất mua hàng = số hóa đơn duy nhất.
+        KHÔNG phải RFM Frequency cuối cùng.
+        FE-05 sẽ review đây có phải là RFM Frequency chính thức hay không.
+
+    - name: "AverageTransactionValue"
+      source: "LineRevenue"
+      fn: "avg_by_invoice"
+      status: "WORKING_ASSUMPTION"
+      description: >
+        Giá trị giao dịch trung bình = TotalMonetary / DistinctInvoiceCount.
+        Denominator là số hóa đơn duy nhất.
+        Đây là working definition — FE-05 có quyền review và điều chỉnh denominator.
+
+    - name: "TransactionLineCount"
+      source: "InvoiceNo"
+      fn: "count"
+      status: "WORKING_ASSUMPTION"
+      description: >
+        Số dòng transaction-line của khách hàng.
+        Khác với DistinctInvoiceCount (mỗi hóa đơn có nhiều dòng).
+        Được tạo để FE-05 có đầy đủ thông tin khi chọn Frequency denominator.
+
+    - name: "DistinctInvoiceCount"
+      source: "InvoiceNo"
+      fn: "nunique"
+      status: "WORKING_ASSUMPTION"
+      description: "Số hóa đơn duy nhất của khách hàng."
+
+    - name: "DistinctProducts"
+      source: "StockCode"
+      fn: "nunique"
+      status: "WORKING_ASSUMPTION"
+      description: "Số sản phẩm duy nhất mà khách hàng đã mua."
+
+    - name: "CancellationInvoiceCount"
+      source: "InvoiceNo"
+      fn: "conditional_nunique_cancellation"
+      status: "WORKING_ASSUMPTION"
+      description: >
+        Số hóa đơn cancellation duy nhất của khách hàng.
+        FE-05 sẽ review cancellation treatment.
+
+    - name: "ReturnInvoiceCount"
+      source: "InvoiceNo"
+      fn: "conditional_nunique_return"
+      status: "WORKING_ASSUMPTION"
+      description: >
+        Số hóa đơn return duy nhất của khách hàng.
+        FE-05 sẽ review return treatment.
+
+  # ---------------------------------------------------------------
+  # Customer key
+  # ---------------------------------------------------------------
+  customer_key: "CustomerID"
+
+  # ---------------------------------------------------------------
+  # LineRevenue derivation
+  # ---------------------------------------------------------------
+  # LineRevenue = Quantity × UnitPrice
+  # Derived in-memory; KHÔNG persist vào input parquet.
+  line_revenue_columns:
+    quantity: "Quantity"
+    unit_price: "UnitPrice"
+    output: "LineRevenue"
+
+  # ---------------------------------------------------------------
+  # Output paths
+  # ---------------------------------------------------------------
+  output:
+    processed_dir: "./data/processed"
+    customer_base_filename: "customer_base.parquet"
+    report_dir: "./reports/fe04"
+
+  # ---------------------------------------------------------------
+  # Metadata (informational)
+  # ---------------------------------------------------------------
+  metadata:
+    stage: "FE-04"
+    task_description: >
+      Tổng hợp dữ liệu transaction-level thành customer-level dataset.
+      1 CustomerID = 1 observation.
+    scope_boundaries:
+      - "Customer aggregation (transaction → customer level)"
+      - "Aggregate behavioral features (baseline)"
+      - "Validation"
+      - "Reporting"
+      - "KHÔNG: RFM, clustering, feature selection, scaling, transformation"
+    notes:
+      - "FE-04 is deterministic: no random operation is performed."
+      - "Input FE-02 parquet is read-only; SHA-256 verified before and after."
+      - "LineRevenue is derived in-memory; never persisted back to input."
+      - "Cancellation/return rows are kept with signed values; treatment deferred to FE-05."
+      - "PurchaseFrequency is a working proxy; not final RFM Frequency."
+      - "TotalMonetary is a signed monetary baseline; not final RFM Monetary."
+      - "FE-04 creates base dataset; FE-05 performs feature selection and RFM."

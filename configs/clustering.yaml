@@ -9,6 +9,13 @@
 #
 # This file only defines the algorithmic search space. Final hyperparameters
 # will be set after the dataset audit and feature inspection stages.
+#
+# The `framework` section below is the ML-01 experiment framework
+# configuration. It is the single source of truth for the runner,
+# validator, artifact writer, and logger introduced in ML-01. Per-
+# algorithm hyperparameters under `algorithms.*` are owned by
+# ML-02 -> ML-06; the framework only knows how to dispatch to them by
+# registered name.
 # ---------------------------------------------------------------------------
 
 clustering:
@@ -26,27 +33,244 @@ clustering:
     kmeans:
       enabled: true
       k_range: [2, 10]
+      init: "k-means++"           # WORKING_ASSUMPTION (ML-02)
       n_init: 10
       max_iter: 300
+      # ML-02 working default cluster count for initial diagnostic
+      # runs. NOT a final methodology decision; EPIC-07 will own the
+      # controlled sweep over `k_range`.
+      # Status: WORKING_ASSUMPTION (ML-02).
+      working_n_clusters: 4
+      tol: 1.0e-4
 
     kmedoids:
-      enabled: true
+      enabled: false                     # OUT OF SCOPE per ADR-0003
+      note: "K-Medoids deferred. See docs/decisions/0003-algorithm-scope.md"
       k_range: [2, 10]
-      metric: "TODO"                # euclidean | precomputed
-      init: "TODO"                  # random | k-medoids++ | heuristic
+      metric: "euclidean"
+      init: "random"
 
     agglomerative:
       enabled: true
       k_range: [2, 10]
-      linkage: "TODO"               # ward | complete | average | single
-      metric: "TODO"                # euclidean | precomputed
+      # ML-03 working defaults for initial diagnostic runs.
+      # NOT a final methodology decision; EPIC-07 will own the
+      # controlled sweep over `k_range`, linkage, and metric.
+      # Status: WORKING_ASSUMPTION (ML-03).
+      working_n_clusters: 4
+      # Linkage criterion. Mirrors the four options supported by
+      # sklearn.cluster.AgglomerativeClustering. EPIC-07 will sweep.
+      # Status: WORKING_ASSUMPTION (ML-03).
+      working_linkage: "ward"
+      # Pairwise distance metric. Ward linkage restricts this to
+      # Euclidean (or L2-equivalent). EPIC-07 will sweep.
+      # Status: WORKING_ASSUMPTION (ML-03).
+      working_metric: "euclidean"
+      # Whether to capture per-merge linkage distances for the
+      # dendrogram diagnostic. True by default because n≈4371 makes
+      # the cost negligible and the diagnostic is useful for ML-03
+      # algorithm-specific scope.
+      compute_distances: true
 
     dbscan:
       enabled: true
-      eps_range: "TODO"             # e.g. [0.1, 0.5, 1.0, 2.0]
-      min_samples_range: "TODO"     # e.g. [5, 10, 20]
+      # ML-04 working defaults for initial diagnostic runs.
+      # NOT a final methodology decision; EPIC-07 will own the
+      # controlled sweep over `eps` and `min_samples`.
+      # Status: WORKING_ASSUMPTION (ML-04).
+      #
+      # DBSCAN has no `n_clusters` parameter — the number of clusters
+      # is discovered from the data. Initial diagnostic uses a single
+      # (eps, min_samples) pair; controlled sweep belongs to EPIC-07.
+      # eps value reflects the standardised feature scale (~std=1) of
+      # the FE-06 final clustering matrix. EPIC-07 will tune.
+      working_eps: 0.5
+      working_min_samples: 5
+      # Pairwise distance metric. Mirrors the metrics advertised by
+      # DBSCANAdapter. EPIC-07 will sweep if multiple metrics are
+      # explored.
+      # Status: WORKING_ASSUMPTION (ML-04).
+      working_metric: "euclidean"
+      # Sklearn convention for noise label. DBSCANAdapter enforces
+      # this label verbatim; any change here MUST be reflected in
+      # the adapter and documented in an ADR.
+      noise_label: -1
+      # Algorithm-specific diagnostic ranges reserved for EPIC-07
+      # controlled sweep (informational only at this stage).
+      eps_range: "TODO"
+      min_samples_range: "TODO"
 
-  # Output
+    gmm:
+      enabled: true
+      # ML-05 working defaults for initial diagnostic runs.
+      # NOT a final methodology decision; EPIC-07 will own the
+      # controlled sweep over `n_components`, `covariance_type`,
+      # `init_params`, and the related convergence parameters.
+      # Status: WORKING_ASSUMPTION (ML-05).
+      working_n_components: 4
+      # Shape of each component's covariance matrix. One of
+      # {"full", "tied", "diag", "spherical"} — mirrors the
+      # values advertised by GMMAdapter. EPIC-07 will sweep.
+      # Status: WORKING_ASSUMPTION (ML-05).
+      working_covariance_type: "full"
+      # EM initialization strategy. One of {"kmeans", "random"}
+      # — mirrors sklearn 1.x supported values. EPIC-07 will sweep.
+      # Status: WORKING_ASSUMPTION (ML-05).
+      working_init_params: "kmeans"
+      # Optional convergence-related working defaults. Mirrors
+      # sklearn 1.x defaults for `tol`, `reg_covar`, `max_iter`,
+      # `n_init`. EPIC-07 will sweep.
+      # Status: WORKING_ASSUMPTION (ML-05).
+      working_tol: 1.0e-3
+      working_reg_covar: 1.0e-6
+      working_max_iter: 100
+      working_n_init: 1
+      # Per-algorithm random-seed override (mirror ML-01 framework
+      # policy: GMM consumes `random_state` for EM initialisation).
+      random_seed: 42
+      # Algorithm-specific diagnostic ranges reserved for EPIC-07
+      # controlled sweep (informational only at this stage).
+      n_components_range: "TODO"
+      covariance_type_options: ["full", "tied", "diag", "spherical"]
+      init_params_options: ["kmeans", "random"]
+
+    fuzzy_cmeans:
+      enabled: true
+      # ML-06 working defaults for initial diagnostic runs.
+      # NOT a final methodology decision; EPIC-07 will own the
+      # controlled sweep over `n_clusters`, `m`, `max_iter`, and
+      # convergence threshold `error`.
+      # Status: WORKING_ASSUMPTION (ML-06).
+      working_n_clusters: 4
+      # Fuzziness parameter m; must be strictly > 1. m = 1
+      # reduces to K-Means in the limit; m -> inf makes every
+      # membership uniform. The custom Bezdek FCM core uses the
+      # canonical exponent ``2 / (m - 1)`` in the membership
+      # update.
+      # Status: WORKING_ASSUMPTION (ML-06).
+      working_fuzziness: 2.0
+      # Maximum number of FCM iterations. Working default mirrors
+      # the sklearn K-Means working default (300) for consistency.
+      # Status: WORKING_ASSUMPTION (ML-06).
+      working_max_iter: 300
+      # Convergence threshold on the membership-matrix max-norm
+      # change (max |u_ik_new - u_ik_old|). Iteration stops when
+      # the change falls below this threshold. Mirrors the
+      # canonical ``cmeans`` update in ``scikit-fuzzy``.
+      # Status: WORKING_ASSUMPTION (ML-06).
+      working_error: 1.0e-4
+      # Per-algorithm random-seed override (mirror ML-01 framework
+      # policy: FCM consumes `random_state` for the
+      # membership-matrix Dirichlet initialisation, with a fixed
+      # seed yielding a deterministic FCM run for a given input
+      # / library version).
+      random_seed: 42
+      # Algorithm-specific diagnostic ranges reserved for EPIC-07
+      # controlled sweep (informational only at this stage).
+      n_clusters_range: "TODO"
+      fuzziness_options: [1.5, 2.0, 2.5, 3.0]
+      max_iter_options: [100, 300, 500]
+
+  # Output (legacy — used by ML-02 → ML-06 directly)
   output:
     labels_path: "./data/processed/cluster_labels.parquet"
     models_path: "./data/processed/cluster_models/"
+
+  # -------------------------------------------------------------------------
+  # ML-01 — Clustering Experiment Framework
+  # -------------------------------------------------------------------------
+  # Single source of truth for the experiment framework. The framework
+  # does NOT compute evaluation metrics (silhouette / DBI / CH /
+  # stability / runtime). Those slots are reserved for EPIC-07/08.
+  # -------------------------------------------------------------------------
+  framework:
+    enabled: true
+
+    experiment:
+      id: "ML-01-framework-template"
+      description: >
+        ML-01 experiment framework template. The runner records this
+        experiment_id in every artifact and the experiment log JSON.
+        ML-02 → ML-06 override the experiment_id per algorithm / k.
+
+    # Random-seed policy
+    random_seed:
+      default: 42
+      # Optional per-algorithm overrides. Algorithms that do not
+      # consume a seed are unaffected.
+      per_algorithm_override: {}
+      # Example:
+      #   per_algorithm_override:
+      #     gmm: 123
+      #     kmeans: 42
+
+    # Input matrix + metadata. The framework reads these in
+    # READ-ONLY mode; it never mutates the FE-06 outputs.
+    input:
+      final_clustering_dataset_path: "./data/processed/final_clustering_dataset.parquet"
+      customer_metadata_path: "./data/processed/customer_metadata.parquet"
+      dataset_version: "FE06-v1.0"
+      customer_key: "CustomerID"
+
+    # Input validation policy
+    validation:
+      require_no_nan: true
+      require_no_inf: true
+      require_all_numeric: true
+      min_samples: 2
+      min_features: 1
+      exclude_customer_id_from_features: true
+
+    # Output policy. Filenames support `{experiment_id}` so multiple
+    # experiments can coexist in the same directory.
+    output:
+      artifacts_dir: "./data/processed/clustering_experiments"
+      report_dir: "./reports/ml01"
+      save_labels: true
+      save_metadata: false
+      save_algorithm_specific: true
+      cluster_labels_filename: "cluster_labels_{experiment_id}.parquet"
+      experiment_log_filename: "experiment_log_{experiment_id}.json"
+      algorithm_output_filename: "algorithm_output_{experiment_id}.parquet"
+
+    # Logging policy
+    logging:
+      log_to_console: true
+      log_to_file: true
+      log_file_dir: "./reports/ml01"
+      log_level: "INFO"
+
+    # Stage metadata (mirrors FE-06 run metadata conventions)
+    metadata:
+      stage: "ML-01"
+      stage_version: "ML01-v1.0"
+      stage_status: "TECHNICALLY_IMPLEMENTED"
+      scope_boundaries:
+        - "Framework only: registry, base interface, result schema, validation, runner, artifacts, logging."
+        - "Framework does NOT implement K-Means / K-Medoids / Agglomerative / DBSCAN / GMM / Fuzzy C-Means."
+        - "Framework does NOT compute evaluation metrics (silhouette / DBI / CH / stability / runtime)."
+        - "Framework does NOT pick best algorithm, ranking, or winner."
+        - "Framework does NOT auto-create research-grade visualization."
+        - "Final clustering dataset input is READ-ONLY."
+      pending_review_notes:
+        - "ML-01 framework interfaces are TECHNICALLY_IMPLEMENTED, not RESEARCH_APPROVED."
+        - "ML-02 → ML-06 will plug concrete adapters into the registry."
+        - "EPIC-07/08 will populate metrics / stability / runtime fields."
+        - "ML-02 K-Means adapter TECHNICALLY_IMPLEMENTED; working_n_clusters=4 is WORKING_ASSUMPTION (not final)."
+        - "ML-02 init='k-means++' is WORKING_ASSUMPTION; no claim of 'best initialization'."
+        - "ML-03 Agglomerative adapter TECHNICALLY_IMPLEMENTED; working_n_clusters=4, linkage='ward', metric='euclidean' are all WORKING_ASSUMPTION (not final)."
+        - "ML-03 supports_random_state=False because Agglomerative in n_clusters mode is deterministic; no claim of best linkage."
+        - "ML-04 DBSCAN adapter TECHNICALLY_IMPLEMENTED; working_eps=0.5, working_min_samples=5, working_metric='euclidean' are WORKING_ASSUMPTION (not final)."
+        - "ML-04 supports_random_state=False because DBSCAN is deterministic in sklearn; noise label -1 preserved verbatim per sklearn convention."
+        - "ML-05 GMM adapter TECHNICALLY_IMPLEMENTED; working_n_components=4, working_covariance_type='full', working_init_params='kmeans' are WORKING_ASSUMPTION (not final)."
+        - "ML-05 supports_random_state=True because GMM consumes random_state for EM initialisation; AIC / BIC / log-likelihood recorded as diagnostics only (NOT used to declare a best configuration)."
+        - "ML-06 Fuzzy C-Means adapter TECHNICALLY_IMPLEMENTED; working_n_clusters=4, working_fuzziness=2.0, working_max_iter=300, working_error=1e-4 are WORKING_ASSUMPTION (not final)."
+        - "ML-06 supports_random_state=True because the custom Bezdek FCM core consumes random_state for the membership-matrix Dirichlet initialisation; with a fixed seed the FCM run is fully deterministic for a given input / library version."
+        - "ML-06 hard label is derived as argmax over the membership matrix; the membership matrix itself is the primary output and is preserved in algorithm_output_*.parquet (CustomerID + Membership_k columns) and Membership_k columns in cluster_labels_*.parquet."
+        - "ML-06 final objective J_m, n_iter, converged flag, and membership confidence summary recorded as diagnostics only; NOT used to declare 'best m' or 'best n_clusters'."
+      assumptions:
+        - "Framework uses one global random_seed policy; per-experiment override is supported."
+        - "Algorithms advertise random_state support via BaseClusterAlgorithm.supports_random_state()."
+        - "CustomerID is NEVER inside the clustering matrix; it lives in customer_metadata only."
+        - "Noise label for DBSCAN-style algorithms defaults to -1 (sklearn convention)."
+        - "K-Means diagnostic WCSS / n_iter_ / cluster_sizes recorded in ClusterResult.extra (not MetricsResult.wcss)."

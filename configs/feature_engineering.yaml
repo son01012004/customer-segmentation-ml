@@ -1,0 +1,361 @@
+# ---------------------------------------------------------------------------
+# FE-05 Feature Engineering configuration — candidate features + selection
+# ---------------------------------------------------------------------------
+#
+# Single source of truth cho FE-05 candidate feature engineering pipeline.
+# Plan V5 - Approved for implementation.
+#
+# Status markers:
+#   WORKING_ASSUMPTION      - Baseline feature; reversible; FE-06
+#                              có thể review và điều chỉnh.
+#   PENDING_REVIEW          - Decision cần được ghi nhận trong reports;
+#                              chưa final cho FE-06.
+#
+# Hard constraints (AGENTS.md):
+# - Input: customer_base.parquet (FE-04) + transactions_clean.parquet (FE-02)
+# - Output: customer_candidates.parquet (Tầng 2 candidate dataset)
+# - SHA-256 cả hai input được ghi nhận trong fe05_run.json.
+# - Không clustering, không feature selection score/rank/weight.
+# - Không gọi feature nào "best/recommended/final".
+# - Reference date: max(InvoiceDate) + 1 day.
+# ---------------------------------------------------------------------------
+
+features:
+  enabled: true
+  random_seed: 42
+
+  # Customer-level aggregation key
+  customer_key: "CustomerID"
+
+  # ---------------------------------------------------------------
+  # Source datasets
+  # ---------------------------------------------------------------
+  source:
+    customer_base_path: "./data/processed/customer_base.parquet"
+    transactions_clean_path: "./data/processed/transactions_clean.parquet"
+
+  # ---------------------------------------------------------------
+  # Reference date computation
+  # ---------------------------------------------------------------
+  # ReferenceDate = max(InvoiceDate) + 1 day
+  # Deterministic strategy: always derived from data.
+  # Status: WORKING_ASSUMPTION (MENTOR_REVIEW_PENDING)
+  reference_date:
+    mode: "snapshot_max"
+    status: "WORKING_ASSUMPTION"
+    review: "MENTOR_REVIEW_PENDING"
+
+  # ---------------------------------------------------------------
+  # RFM Feature Definitions
+  # ---------------------------------------------------------------
+  rfm:
+    # Recency: days since ReferenceDate (includes all transactions)
+    recency:
+      enabled: true
+      column: "LastPurchaseDate"
+      aggregation: "days_since_reference"
+      status: "WORKING_ASSUMPTION"
+      note: "Includes cancellation/return transactions. PENDING_REVIEW for purchase-only."
+
+    # Frequency: ONE materialized candidate from comparison
+    # Default: Frequency_ByInvoice (FREQ-01)
+    frequency:
+      enabled: true
+      mode: "by_invoice"  # FREQ-01: by invoice
+      # comparison modes available: "by_invoice", "by_transaction_line"
+      # Both computed for comparison; only one materialized
+      status: "WORKING_ASSUMPTION"
+      note: "FREQ-01 vs FREQ-02 comparison required. Default: FREQ-01."
+      output_column: "Frequency"
+
+    # Monetary: ONE materialized candidate from comparison
+    # Default: MonetarySigned
+    monetary:
+      enabled: true
+      default_variant: "signed"  # signed = MonetarySigned
+      # Variants available: "signed", "absolute", "purchase_only", "cancellation_only"
+      # All 4 computed for comparison; only one materialized
+      status: "WORKING_ASSUMPTION"
+      note: "4 distinct definition variants compared. Default: MonetarySigned."
+      output_column: "Monetary"
+
+  # ---------------------------------------------------------------
+  # Quantity Feature Definitions
+  # ---------------------------------------------------------------
+  quantity:
+    enabled: true
+    # Variants: "signed" (default), "purchase_only"
+    # Both computed for comparison; only one working set materialized
+    default_variant: "signed"
+    status: "WORKING_ASSUMPTION"
+    note: "Signed vs purchase-only comparison required. Default: signed."
+
+    features:
+      - name: "TotalQuantity"
+        source: "TotalQuantity"
+        role: "BASE_REFERENCE"  # From FE-04; use as source for candidate
+        variant: "signed"  # FE-04 TotalQuantity is already signed
+        status: "WORKING_ASSUMPTION"
+        description: "Total signed quantity from FE-04."
+
+      - name: "AverageQuantity"
+        source: "TotalQuantity"
+        aggregation: "avg_by_invoice"
+        variant: "signed"
+        status: "WORKING_ASSUMPTION"
+        description: "Average signed quantity per invoice."
+
+      - name: "BasketSize"
+        source: "TotalQuantity"
+        aggregation: "avg_by_invoice"
+        variant: "signed"
+        status: "WORKING_ASSUMPTION"
+        description: "Average signed quantity per invoice (alias for AverageQuantity)."
+
+  # ---------------------------------------------------------------
+  # Transaction Behavior Features
+  # ---------------------------------------------------------------
+  transaction_behavior:
+    enabled: true
+
+    features:
+      - name: "TenureDays"
+        source: "InvoiceDate"
+        aggregation: "tenure_days"  # LastPurchaseDate - FirstPurchaseDate
+        status: "WORKING_ASSUMPTION"
+        description: "Transaction tenure in days (all transactions)."
+
+      - name: "PurchaseIntervalMean"
+        source: "InvoiceDate"
+        aggregation: "interval_mean"  # Invoice-level; NaN if < 2 invoices
+        status: "WORKING_ASSUMPTION"
+        description: "Mean days between consecutive invoices. NaN = N/A if < 2 invoices."
+
+      - name: "PurchaseIntervalStd"
+        source: "InvoiceDate"
+        aggregation: "interval_std"  # Invoice-level; ddof=1; NaN if < 2 invoices
+        status: "WORKING_ASSUMPTION"
+        description: >
+          Std of days between consecutive invoices. ddof=1.
+          NaN = N/A if < 2 invoices. NOT filled with 0.
+
+      - name: "ActiveDays"
+        source: "InvoiceDate"
+        aggregation: "unique_date_count"  # Calendar days (not raw datetime)
+        status: "WORKING_ASSUMPTION"
+        description: "Number of unique calendar days with transactions."
+
+      - name: "AverageInvoiceValue"
+        source: "Monetary"  # Computed Monetary / Frequency
+        aggregation: "ratio"
+        status: "WORKING_ASSUMPTION"
+        description: >
+          Monetary / Frequency. FE-05 candidate mới.
+          FE-04 AverageTransactionValue giữ nguyên (BASE_REFERENCE).
+
+  # ---------------------------------------------------------------
+  # Diversity Features
+  # ---------------------------------------------------------------
+  diversity:
+    enabled: true
+
+    features:
+      - name: "ProductsPerInvoice"
+        source: "DistinctProducts"
+        aggregation: "ratio_by_invoice"  # DistinctProducts / DistinctInvoiceCount
+        status: "WORKING_ASSUMPTION"
+        description: >
+          Ratio proxy for product diversity.
+          NOTE: Not a standard diversity metric; ratio interpretation required.
+          Ghi rõ trong báo cáo là "ratio proxy".
+
+  # UNSUPPORTED features (NOT materialized):
+  # - CategoryCount: Dataset không có official taxonomy
+
+  unsupported:
+    - name: "CategoryCount"
+      reason: "Dataset không có official taxonomy. Không được materialize."
+
+  # ---------------------------------------------------------------
+  # Cancellation/Return Features
+  # ---------------------------------------------------------------
+  cancellation:
+    enabled: true
+
+    features:
+      - name: "CancellationRate"
+        source: "CancellationInvoiceCount"
+        aggregation: "rate_by_frequency"  # CancellationInvoiceCount / Frequency
+        status: "WORKING_ASSUMPTION"
+        description: "Ratio of cancellation invoices to total invoices."
+
+      - name: "ReturnRate"
+        source: "ReturnInvoiceCount"
+        aggregation: "rate_by_frequency"  # ReturnInvoiceCount / Frequency
+        status: "WORKING_ASSUMPTION"
+        description: "Ratio of return invoices to total invoices."
+
+  # ---------------------------------------------------------------
+  # Feature Layer Classification
+  # ---------------------------------------------------------------
+  # IDENTIFIER_ONLY: Chỉ dùng làm primary key
+  # SOURCE_ONLY: Dùng làm nguồn tính toán features khác
+  # BASE_REFERENCE: Reference feature từ FE-04; dùng để derive candidates
+  # CANDIDATE: Engineered candidate feature; xem xét cho clustering (FE-06)
+  # UNSUPPORTED: Không materialize vì không có cơ sở đủ
+
+  layer_classification:
+    IDENTIFIER_ONLY:
+      - CustomerID
+
+    SOURCE_ONLY:
+      - InvoiceDate
+      - InvoiceNo
+      - StockCode
+      - Quantity
+      - LineRevenue
+      - IsCancellation
+      - IsReturn
+
+    BASE_REFERENCE:
+      - FirstPurchaseDate
+      - LastPurchaseDate
+      - TransactionLineCount
+      - DistinctInvoiceCount
+      - DistinctProducts
+      - CancellationInvoiceCount
+      - ReturnInvoiceCount
+      - TotalQuantity  # FE-04 signed baseline
+      - TotalMonetary  # FE-04 signed baseline
+      - PurchaseFrequency  # FE-04 working proxy
+      - AverageTransactionValue  # FE-04 baseline; giữ nguyên
+
+    CANDIDATE:
+      - Recency
+      - Frequency
+      - Monetary
+      - TotalQuantity  # Tầng 2 candidate (signed)
+      - AverageQuantity
+      - BasketSize
+      - TenureDays
+      - PurchaseIntervalMean
+      - PurchaseIntervalStd
+      - ActiveDays
+      - AverageInvoiceValue
+      - ProductsPerInvoice
+      - CancellationRate
+      - ReturnRate
+
+    UNSUPPORTED:
+      - CategoryCount
+
+  # ---------------------------------------------------------------
+  # Feature Selection Gates (Evidence-based)
+  # ---------------------------------------------------------------
+  selection:
+    # Gate 1: Interpretability
+    # Feature phải có business interpretation rõ ràng.
+    interpretability_gate:
+      enabled: true
+      status: "WORKING_ASSUMPTION"
+
+    # Gate 2: Data Quality
+    # Feature không được có quá nhiều missing values mà không có lý do.
+    data_quality_gate:
+      enabled: true
+      max_missing_ratio: 0.5  # 50% threshold
+      status: "WORKING_ASSUMPTION"
+
+    # Gate 3: Leakage
+    # Feature không được leak target information.
+    leakage_gate:
+      enabled: true
+      status: "WORKING_ASSUMPTION"
+
+    # Gate 4: Zero Variance
+    # Feature có zero variance không có giá trị phân biệt.
+    zero_variance_gate:
+      enabled: true
+      status: "WORKING_ASSUMPTION"
+
+    # Gate 5: Redundancy (Diagnostic only)
+    # Feature highly correlated có thể redundant.
+    # Status: Diagnostic - không tự động drop.
+    redundancy_gate:
+      enabled: true
+      threshold: 0.95  # Pearson correlation threshold
+      status: "DIAGNOSTIC"
+      note: "Diagnostic only. Không tự động loại bỏ feature."
+
+    # Gate 6: Stability (Diagnostic only)
+    # Feature stability across bootstrap samples.
+    # Status: Diagnostic - không ảnh hưởng quyết định.
+    stability_gate:
+      enabled: true
+      n_bootstrap: 100
+      status: "DIAGNOSTIC"
+      note: "Diagnostic only. Không ảnh hưởng quyết định."
+
+    # Gate 7: Shapiro-Wilk (Diagnostic only)
+    # Normality test cho phân bố feature.
+    # Status: Diagnostic only - không tự động KEEP/DROP.
+    shapiro_wilk_gate:
+      enabled: true
+      alpha: 0.05
+      status: "DIAGNOSTIC"
+      note: "Optional diagnostic only. Không tự động KEEP/DROP feature."
+
+    # Decision outcomes:
+    # RETAIN_CANDIDATE: Đủ điều kiện tiếp tục sang FE-06
+    # EXCLUDE: Không đủ điều kiện
+    # ADJUST: Cần điều chỉnh definition
+    # PENDING_REVIEW: Cần mentor review
+
+  # ---------------------------------------------------------------
+  # Analysis Scope
+  # ---------------------------------------------------------------
+  # Correlation/redundancy/outlier/selection analysis chỉ áp dụng
+  # cho numeric Tầng 2 CANDIDATE features.
+  analysis_scope:
+    numeric_candidates_only: true
+    include_date_features: false  # Date features excluded from correlation
+
+  # ---------------------------------------------------------------
+  # Output paths
+  # ---------------------------------------------------------------
+  output:
+    processed_dir: "./data/processed"
+    candidate_filename: "customer_candidates.parquet"
+    report_dir: "./reports/fe05"
+
+  # ---------------------------------------------------------------
+  # Metadata
+  # ---------------------------------------------------------------
+  metadata:
+    stage: "FE-05"
+    task_description: >
+      Feature engineering: RFM + extended behavioral candidate features.
+      Feature selection: evidence-based gates.
+      Candidate dataset Tầng 2 cho clustering (FE-06).
+    scope_boundaries:
+      - "RFM candidate features (ONE materialized each)"
+      - "Extended behavioral candidate features"
+      - "Monetary/Frequency/Quantity comparison reports"
+      - "Distribution/variance/correlation/redundancy/outlier analysis"
+      - "Evidence-based feature selection"
+      - "Candidate dataset Tầng 2"
+      - "Feature dictionary"
+      - "Reproducibility metadata"
+      - "KHÔNG: clustering, scaling, transformation"
+    notes:
+      - "ReferenceDate = max(InvoiceDate) + 1 day (deterministic)."
+      - "ONE Monetary materialized (default: MonetarySigned)."
+      - "ONE Frequency materialized (default: Frequency_ByInvoice)."
+      - "ONE Quantity working set materialized (default: signed)."
+      - "PurchaseIntervalStd uses ddof=1."
+      - "PurchaseInterval < 2 invoices => NaN (NOT filled with 0)."
+      - "CategoryCount NOT materialized (unsupported)."
+      - "ProductsPerInvoice is ratio proxy (not standard diversity metric)."
+      - "Selection: evidence-based gates, no numerical score/rank/weight."
+      - "No feature called 'best/recommended/final'."
+      - "All PENDING_REVIEW decisions documented in reports."

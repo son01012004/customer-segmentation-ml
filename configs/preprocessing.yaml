@@ -1,48 +1,128 @@
 # ---------------------------------------------------------------------------
-# Preprocessing configuration
+# Preprocessing configuration — FE-02 (cleaning pipeline)
 # ---------------------------------------------------------------------------
-# All thresholds and rules are placeholders. Final values will be set
-# after the dataset audit (notebooks/01_dataset_audit).
+#
+# This file is the **single source of truth** for the FE-02 cleaning
+# rules. The orchestrator at ``scripts/run_fe02_cleaning.py`` reads this
+# YAML, validates it, and constructs the
+# ``customer_segmentation.preprocessing.cleaning.PipelineConfig`` dataclass
+# used by the cleaning stages.
+#
+# Status markers:
+#   WORKING_ASSUMPTION      - The rule is applied by default. The decision
+#                              is reversible and does not block FE-02.
+#   PENDING_MENTOR_REVIEW   - The rule keeps the rows (flag, not drop).
+#                              Final treatment belongs to the RFM stage
+#                              (FE-03). Documented in
+#                              ``reports/fe02/cleaning_report.md §9``.
+#
+# Hard constraints (from AGENTS.md):
+# - random_seed must come from a config file, never a hard-coded literal
+#   in code. FE-02 is deterministic, so the seed is informational.
+# - All cleaning decisions listed here are audited by FE-01 (see
+#   ``docs/data_dictionary/initial_data_profile.md``).
 # ---------------------------------------------------------------------------
 
 preprocessing:
   enabled: true
   random_seed: 42
 
-  # Source dataset (resolved from configs/dataset.yaml)
+  # ---------------------------------------------------------------
+  # Source dataset
+  # ---------------------------------------------------------------
+  # The actual filename on disk is intentionally resolved relative to
+  # the primary directory supplied via CLI. The value below is the
+  # post-rename name recorded in ``configs/dataset.yaml``. Keep them in
+  # sync via an ADR (the current on-disk filename is "Online Retail.xlsx").
   source:
-    role: "primary"            # one of: primary | backup
-    raw_filename: "online_retail.xlsx"
+    role: "primary"
+    expected_raw_filename: "online_retail.xlsx"
 
-  # Missing values
-  missing_values:
-    strategy: "TODO"           # e.g. drop | impute_median | impute_zero | keep
-    columns: []                # TODO: list columns with explicit policy
-    track_removed_rows: true
+  # ---------------------------------------------------------------
+  # Pipeline rules — top-level keys (1:1 with PipelineConfig)
+  # ---------------------------------------------------------------
 
   # Duplicate handling
-  duplicates:
-    subset_columns: []         # TODO: e.g. ["InvoiceNo", "StockCode", "InvoiceDate"]
-    keep: "none"               # first | last | none
-    track_removed_rows: true
+  # --------------------
+  # ``duplicate_subset: null`` = exact-row deduplication.
+  # ``duplicate_keep`` must be one of: first | last | none.
+  duplicate_subset: null
+  duplicate_keep: "first"
 
-  # Invalid records (e.g. cancelled invoices, non-positive quantities)
-  invalid_records:
-    drop_cancelled_invoices: true
-    cancellation_prefix: "C"
-    drop_non_positive_quantity: true
-    drop_non_positive_unit_price: true
-    drop_missing_customer_id: true
+  # Missing-value handling (applied AFTER invalid-record rules)
+  # -----------------------------------------------------------
+  # Valid strategies: drop | impute_zero | impute_median | impute_mean | keep
+  # ``missing_columns`` lists the columns the strategy applies to.
+  # FE-02 currently applies "keep" to an empty list — there is no
+  # residual missing data after the invalid-record drops.
+  missing_strategy: "keep"
+  missing_columns: []
 
   # Outlier handling
-  outliers:
-    method: "TODO"             # e.g. iqr | zscore | winsorize
-    columns: []                # TODO: list numeric columns
-    action: "TODO"             # e.g. clip | remove | flag
-    iqr_multiplier: 1.5
-    zscore_threshold: 3.0
+  # ----------------
+  # Off by default — outlier policy is PENDING_MENTOR_REVIEW.
+  # Valid actions:  none | clip | remove | flag
+  # Valid methods:  iqr | zscore | winsorize
+  # Currently ``outlier_action: "none"`` causes the cleaning pipeline
+  # to skip the outlier stage entirely. The cleaned dataset therefore
+  # preserves the raw distribution of ``Quantity`` and ``UnitPrice``
+  # so the next stage can decide on outlier policy.
+  outlier_action: "none"
+  outlier_method: "iqr"
+  outlier_columns: []
+  # Detection thresholds used by the algorithms above. They are only
+  # consulted when ``outlier_action != "none"`` AND ``outlier_columns``
+  # is non-empty. FE-02 keeps them at the module defaults in
+  # ``src/customer_segmentation/preprocessing/outliers.py``.
+  outlier_iqr_multiplier: 1.5
+  outlier_zscore_threshold: 3.0
 
-  # Output
+  # ---------------------------------------------------------------
+  # Invalid-record rules (1:1 with InvalidRecordRules dataclass)
+  # ---------------------------------------------------------------
+  invalid_records:
+
+    # --- Drop rules (WORKING_ASSUMPTION) ---
+    drop_missing_invoice_no: true             # CL-10
+    drop_missing_customer_id: true           # CL-01
+    drop_missing_description: true           # CL-03
+    drop_unparseable_invoice_date: true      # CL-04
+    drop_zero_quantity: true                 # CL-05
+    drop_non_positive_unit_price: true       # CL-07
+
+    # --- Flag rules (PENDING_MENTOR_REVIEW) ---
+    # These do NOT drop rows. They keep the rows and add boolean flag
+    # columns (``IsCancellation`` / ``IsReturn``) so the next stage
+    # (FE-03 / RFM) can decide whether to exclude them. The decision
+    # is not silently adopted here.
+    flag_cancellations: true                 # CL-08  PENDING_MENTOR_REVIEW
+    flag_returns: true                       # CL-06  PENDING_MENTOR_REVIEW
+
+    cancellation_prefix: "C"
+
+  # ---------------------------------------------------------------
+  # Output paths
+  # ---------------------------------------------------------------
+  # Resolved relative to the repo root by the orchestrator. FE-02
+  # writes BOTH the Parquet and CSV mirrors of the cleaned dataset.
+  # Set ``write_csv: false`` (or pass ``--no-csv`` on the CLI) to
+  # skip the CSV mirror.
   output:
-    write_interim: true
-    interim_path: "./data/interim/transactions_clean.parquet"
+    processed_dir: "./data/processed"
+    parquet_filename: "transactions_clean.parquet"
+    csv_filename: "transactions_clean.csv"
+    write_csv: true
+    report_dir: "./reports/fe02"
+
+  # ---------------------------------------------------------------
+  # Metadata (informational, not consumed by the orchestrator)
+  # ---------------------------------------------------------------
+  metadata:
+    stage: "FE-02"
+    rule_status_legend:
+      WORKING_ASSUMPTION: "Low-risk rule applied by default; reversible."
+      PENDING_MENTOR_REVIEW: "Flag-only rule; downstream stage decides final treatment."
+    notes:
+      - "FE-02 is deterministic: no random operation is performed."
+      - "The raw file is read-only; it is never modified by the pipeline."
+      - "Cleaning never aggregates to customer level; that is FE-03."

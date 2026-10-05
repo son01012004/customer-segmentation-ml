@@ -1,0 +1,305 @@
+# ---------------------------------------------------------------------------
+# EXP-05 — Stability & Reproducibility Configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the EXP-05 stability & reproducibility
+# experiment. EXP-05 generates raw stability / reproducibility evidence
+# across three blocks (R, S, N). It does NOT perform stability analysis
+# (that belongs to EPIC-08).
+#
+# EXP-05 scope:
+#   Block R — Reproducibility: 5 algorithms × n_repeat=5 × seed=42.
+#     Verify labels_hash + metric values deterministic. NOT stability.
+#   Block S — Random Seed Stability: K-Means + GMM + FCM × 5 seeds.
+#     Fixed hyperparameters. Records metrics, cluster sizes, labels_hash.
+#   Block N — Feature Perturbation: in-memory Gaussian noise on
+#     FE-06 final clustering matrix at sigma = 0, 0.01, 0.05 × std.
+#     sigma=0 = sanity (reproduce EXP-01 baseline).
+#     sigma=0.01, 0.05 = 3 perturbation seeds each.
+#
+# EXP-05 outputs:
+#   - Raw label-level artifact (exp05_cluster_labels.parquet) for EPIC-08.
+#   - Per-block results CSVs and aggregate CSVs.
+#   - Manifest, run_summary, pending_review, analysis markdown.
+#
+# EXP-05 does NOT:
+#   - Compute ARI / AMI (EPIC-08 scope).
+#   - Hungarian matching (EPIC-08 scope).
+#   - Statistical tests (EPIC-08 scope).
+#   - Confidence intervals (EPIC-08 scope).
+#   - Algorithm comparison / ranking (EPIC-08 scope).
+#   - Composite score / weighted ranking.
+#   - "Best" / "winner" / "optimal" / "recommended" / "final" labels.
+#   - Sampling / subsampling.
+#   - Re-sweep K (EXP-02 owns).
+#   - Re-sweep hyperparameters (EXP-03 owns).
+#   - Re-sweep preprocessing (EXP-04 owns).
+#   - Persist perturbed dataset to disk.
+#   - Customer profiling / segment naming.
+# ---------------------------------------------------------------------------
+
+exp05:
+  name: "EXP-05 Stability & Reproducibility"
+  description: >
+    Generate raw stability / reproducibility evidence across three
+    blocks (R, S, N) for the five EPIC-06 benchmark algorithms.
+    EXP-05 is evidence generation, NOT stability analysis. ARI/AMI
+    computation, Hungarian matching, statistical tests, and confidence
+    intervals belong to EPIC-08.
+
+  # -----------------------------------------------------------------------
+  # Dataset identity (read-only)
+  # -----------------------------------------------------------------------
+  dataset:
+    version: "FE06-v1.0"
+    final_clustering_dataset_path: "./data/processed/final_clustering_dataset.parquet"
+    customer_metadata_path: "./data/processed/customer_metadata.parquet"
+    customer_key: "CustomerID"
+
+  # -----------------------------------------------------------------------
+  # Algorithm participation
+  # -----------------------------------------------------------------------
+  # Canonical order (matches EXP-01).
+  algorithms:
+    - kmeans
+    - agglomerative
+    - dbscan
+    - gmm
+    - fuzzy_cmeans
+
+  # -----------------------------------------------------------------------
+  # Working defaults (mirror EXP-01 / configs/exp01_baseline.yaml)
+  # -----------------------------------------------------------------------
+  # Non-K hyperparameters held fixed across all three blocks.
+  # K = 4 throughout.
+  working_defaults:
+    kmeans:
+      n_clusters: 4
+      init: "k-means++"
+      n_init: 10
+      max_iter: 300
+      tol: 1.0e-4
+    agglomerative:
+      n_clusters: 4
+      linkage: "ward"
+      metric: "euclidean"
+      compute_distances: true
+    dbscan:
+      eps: 0.5
+      min_samples: 5
+      metric: "euclidean"
+    gmm:
+      n_components: 4
+      covariance_type: "full"
+      init_params: "kmeans"
+      tol: 1.0e-3
+      reg_covar: 1.0e-6
+      max_iter: 100
+      n_init: 1
+    fuzzy_cmeans:
+      n_clusters: 4
+      m: 2.0
+      max_iter: 300
+      error: 1.0e-4
+
+  # -----------------------------------------------------------------------
+  # Block R — Reproducibility
+  # -----------------------------------------------------------------------
+  # 5 algorithms × n_repeat=5 × seed=42. Verify labels_hash and
+  # metric values are deterministic across repeats. This is
+  # REPRODUCIBILITY_VERIFICATION, NOT stability analysis.
+  block_r:
+    name: "reproducibility"
+    status: "REPRODUCIBILITY_VERIFICATION"
+    not_status: "STABILITY_ANALYSIS"
+    algorithms:
+      - kmeans
+      - agglomerative
+      - dbscan
+      - gmm
+      - fuzzy_cmeans
+    seed: 42
+    n_repeat: 5
+    determinism_expectation: >
+      With fixed seed=42 and EXP-01 working default hyperparameters,
+      all clustering algorithms in the EPIC-06 benchmark MUST produce
+      identical labels_hash and metric values across n_repeat=5.
+      runtime_seconds may vary (wall-clock).
+
+  # -----------------------------------------------------------------------
+  # Block S — Random Seed Stability
+  # -----------------------------------------------------------------------
+  # K-Means + GMM + FCM (3 algorithms with random axis) × 5 seeds.
+  # Fixed hyperparameters. Records metrics, cluster sizes,
+  # labels_hash. Agglomerative and DBSCAN are deterministic and are
+  # NOT included in this block.
+  block_s:
+    name: "random_seed_stability"
+    status: "STABILITY_EVIDENCE_GENERATION"
+    not_status: "STABILITY_ANALYSIS"
+    algorithms:
+      - kmeans
+      - gmm
+      - fuzzy_cmeans
+    excluded_algorithms:
+      - agglomerative
+      - dbscan
+    exclusion_reason: >
+      Agglomerative (n_clusters mode) and DBSCAN are deterministic
+      in sklearn; their labels do not depend on a random seed. They
+      do not require a seed sweep.
+    seeds:
+      - 42
+      - 7
+      - 123
+      - 2024
+      - 1729
+    n_repeat: 1
+
+  # -----------------------------------------------------------------------
+  # Block N — Feature Perturbation
+  # -----------------------------------------------------------------------
+  # In-memory Gaussian noise on FE-06 final clustering matrix.
+  # sigma = scale × feature_std. sigma=0 = sanity (reproduce
+  # EXP-01 baseline). sigma=0.01, 0.05 × 3 perturbation seeds.
+  block_n:
+    name: "feature_perturbation"
+    status: "PERTURBATION_EVIDENCE_GENERATION"
+    not_status: "STABILITY_ANALYSIS"
+    algorithms:
+      - kmeans
+      - agglomerative
+      - dbscan
+      - gmm
+      - fuzzy_cmeans
+    algorithm_seed: 42          # seed for algorithm itself
+    sigma_grid:
+      - 0.0                     # sanity run; 1 run per algorithm
+      - 0.01                    # 1% × std
+      - 0.05                    # 5% × std
+    sigma_zero_repeats: 1       # only 1 sanity run per algorithm
+    nonzero_perturbation_seeds:
+      - 42
+      - 43
+      - 44
+    perturbation_distribution: "gaussian"     # mean=0, scale=sigma×std
+    perturb_in_memory_only: true             # DO NOT persist perturbed X
+    sigma_zero_expectation: >
+      With sigma=0, the perturbed matrix equals the original matrix.
+      Therefore the resulting cluster labels MUST equal the EXP-01
+      baseline labels for the same algorithm / hyperparameters / seed.
+      This is the sanity check that the perturbation pipeline is
+      correctly wired.
+
+  # -----------------------------------------------------------------------
+  # Metrics
+  # -----------------------------------------------------------------------
+  metrics:
+    internal:
+      - silhouette
+      - davies_bouldin
+      - calinski_harabasz
+      - wcss
+    status_policy: "exp01_mirror"
+    wcss_centroid: "arithmetic_hard_labels"
+    dbscan_noise_exclusion: true
+
+  # -----------------------------------------------------------------------
+  # Decision status taxonomy
+  # -----------------------------------------------------------------------
+  # Only these labels are permitted in EXP-05 outputs.
+  decision_status:
+    permitted:
+      - "REPRODUCIBILITY_VERIFIED"
+      - "REPRODUCIBILITY_FAILED"
+      - "STABILITY_EVIDENCE_GENERATED"
+      - "PERTURBATION_EVIDENCE_GENERATED"
+      - "SIGMA_ZERO_BASELINE_MATCH"
+      - "SIGMA_ZERO_BASELINE_MISMATCH"
+      - "PENDING_REVIEW"
+    forbidden:
+      - "BEST"
+      - "OPTIMAL"
+      - "WINNER"
+      - "SUPERIOR"
+      - "RECOMMENDED"
+      - "FINAL"
+
+  # -----------------------------------------------------------------------
+  # Output
+  # -----------------------------------------------------------------------
+  output:
+    reports_dir: "./reports/exp05"
+    labels_artifact_filename: "exp05_cluster_labels.parquet"
+
+  # -----------------------------------------------------------------------
+  # Decision status (overall)
+  # -----------------------------------------------------------------------
+  decision_status_overall:
+    block_r_intent: "REPRODUCIBILITY_VERIFICATION"
+    block_s_intent: "STABILITY_EVIDENCE_GENERATION"
+    block_n_intent: "PERTURBATION_EVIDENCE_GENERATION"
+    next_stage_owner: "EPIC-08"
+    labels_artifact_owner: "EPIC-08"
+
+  # -----------------------------------------------------------------------
+  # PENDING_REVIEW notes
+  # -----------------------------------------------------------------------
+  pending_review_notes:
+    - id: "EXP05-BLK-01"
+      decision: "Block R = reproducibility verification, NOT stability analysis"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-BLK-02"
+      decision: "Block S chỉ cho 3 algorithms có random axis (K-Means + GMM + FCM)"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-BLK-03"
+      decision: "Block N = in-memory perturbation; sigma=[0, 0.01, 0.05]×std"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-SEED-01"
+      decision: "Seeds for Block S = [42, 7, 123, 2024, 1729]"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-PERT-01"
+      decision: "Perturbation distribution = Gaussian, column-wise std scaled"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-PERT-02"
+      decision: "sigma=0 sanity run must reproduce EXP-01 baseline (cluster_labels identical)"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-ART-01"
+      decision: "Labels artifact schema (run_id, block, algorithm, seed, sigma, perturbation_seed, repeat_index, CustomerID, cluster_label)"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-DEC-01"
+      decision: "Decision status taxonomy: REPRODUCIBILITY_VERIFIED / REPRODUCIBILITY_FAILED / STABILITY_EVIDENCE_GENERATED / PERTURBATION_EVIDENCE_GENERATED / SIGMA_ZERO_BASELINE_MATCH / SIGMA_ZERO_BASELINE_MISMATCH / PENDING_REVIEW"
+      status: "WORKING_ASSUMPTION"
+    - id: "EXP05-EPIC-08"
+      decision: "ARI/AMI, Hungarian matching, statistical tests, confidence intervals thuộc EPIC-08"
+      status: "TECHNICALLY_IMPLEMENTED"
+
+  scope_boundaries:
+    - "Block R = REPRODUCIBILITY_VERIFICATION (5 algorithms × n_repeat=5, seed=42). NOT stability analysis."
+    - "Block S = STABILITY_EVIDENCE_GENERATION (K-Means + GMM + FCM × 5 seeds). Agglomerative + DBSCAN are deterministic and NOT included."
+    - "Block N = PERTURBATION_EVIDENCE_GENERATION (5 algorithms × sigma=[0, 0.01, 0.05] × std). In-memory only. NO persistence of perturbed X."
+    - "sigma=0 is sanity run; must reproduce EXP-01 baseline cluster_labels."
+    - "sigma=0.01, 0.05 with 3 perturbation seeds; sigma=0 only has 1 sanity run."
+    - "Labels artifact (exp05_cluster_labels.parquet) is REQUIRED for EPIC-08."
+    - "ARI/AMI / Hungarian / statistical tests / confidence intervals belong to EPIC-08."
+    - "NO 'best/optimal/winner/recommended/final' labels in EXP-05 outputs."
+    - "NO composite score / cross-algorithm ranking."
+    - "NO sampling / subsampling."
+    - "NO K sweep (EXP-02 owns)."
+    - "NO re-sweep hyperparameters (EXP-03 owns)."
+    - "NO re-sweep preprocessing (EXP-04 owns)."
+    - "FE-05 / FE-06 outputs READ-ONLY (SHA verified pre/post)."
+
+  assumptions:
+    - "FE-06 final clustering matrix is READ-ONLY during EXP-05."
+    - "CustomerID is in metadata only; the matrix never contains identifiers."
+    - "EXP-01 working defaults are accepted as WORKING_ASSUMPTION (mirrored by EXP-05)."
+    - "Block S seed list [42, 7, 123, 2024, 1729] is WORKING_ASSUMPTION."
+    - "Block N sigma list [0.0, 0.01, 0.05] is WORKING_ASSUMPTION."
+    - "Block N perturbation seeds [42, 43, 44] is WORKING_ASSUMPTION."
+    - "Perturbation distribution = Gaussian; column-wise std scaling."
+    - "GMM/FCM hard labels = argmax of soft outputs (NOT GMM Gaussian means or FCM fuzzy centroids)."
+    - "DBSCAN noise handling mirror EXP-01 (exclude noise from internal metrics + WCSS)."
+    - "Block R: seed=42, n_repeat=5."
+    - "Block S: per algorithm, seeds × n_repeat=1."
+    - "Block N: per algorithm, sigma × perturbation_seeds × n_repeat=1."
