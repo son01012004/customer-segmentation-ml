@@ -1,0 +1,147 @@
+# ---------------------------------------------------------------------------
+# Outlier analysis configuration — FE-03
+# ---------------------------------------------------------------------------
+#
+# This file is the **single source of truth** for the FE-03 outlier
+# analysis pipeline. The orchestrator at
+# ``scripts/run_fe03_outlier_analysis.py`` reads this YAML, validates it,
+# and constructs the
+# ``customer_segmentation.config.outlier_loader.OutlierAnalysisConfig``
+# dataclass used by the analysis stages.
+#
+# Status markers:
+#   WORKING_ASSUMPTION       - The detection parameter is wired up and
+#                               safe to compute. No treatment applied.
+#   PENDING_MENTOR_REVIEW    - Detection is wired up but the corresponding
+#                               treatment decision is **not** silently
+#                               adopted. Mentor approval is required.
+#
+# Hard constraints (from AGENTS.md):
+# - Detection thresholds come from this file, never from hard-coded
+#   literals in code.
+# - The FE-02 cleaning pipeline and ``configs/preprocessing.yaml`` are
+#   **not** modified by FE-03.
+# - ``output.write_treated_dataset`` must remain ``false`` by default. A
+#   treated dataset is only written when the YAML AND the CLI agree.
+# - Customer-level outputs are explicitly diagnostic; they are **not** a
+#   substitute for FE-04 RFM / extended-behavioural features.
+# ---------------------------------------------------------------------------
+
+outlier_analysis:
+  enabled: true
+  random_seed: 42
+
+  # ---------------------------------------------------------------
+  # Source dataset
+  # ---------------------------------------------------------------
+  # ``cleaned_dataset_path`` is the FE-02 cleaned transaction-level
+  # parquet. ``raw_dataset_path`` is recorded so the orchestrator can
+  # re-hash the raw file and prove it is not mutated.
+  source:
+    role: "primary"
+    cleaned_dataset_path: "./data/processed/transactions_clean.parquet"
+    raw_dataset_path: "./data/raw/primary/Online Retail.xlsx"
+
+  # ---------------------------------------------------------------
+  # Transaction-level features to analyse
+  # ---------------------------------------------------------------
+  # Each feature specifies a detection method and a treatment. The
+  # treatment defaults to "none" so the FE-03 run is exploratory by
+  # default. To opt in to a non-KEEP treatment, both this YAML and the
+  # orchestrator's --write-treated flag must agree.
+  transaction_features:
+
+    - column: "Quantity"
+      detection: "iqr"          # iqr | zscore | percentile
+      iqr_multiplier: 1.5
+      percentile_thresholds: [99.0, 99.5, 99.9]
+      zscore_threshold: 3.0
+      treatment: "none"
+      status: "PENDING_MENTOR_REVIEW"
+
+    - column: "UnitPrice"
+      detection: "iqr"
+      iqr_multiplier: 1.5
+      percentile_thresholds: [99.0, 99.5, 99.9]
+      zscore_threshold: 3.0
+      treatment: "none"
+      status: "PENDING_MENTOR_REVIEW"
+
+    # LineRevenue is a derived feature (Quantity * UnitPrice). It is
+    # computed on-the-fly by the orchestrator and never persisted back
+    # to the cleaned dataset.
+    - column: "LineRevenue"
+      detection: "iqr"
+      iqr_multiplier: 1.5
+      percentile_thresholds: [99.0, 99.5, 99.9]
+      zscore_threshold: 3.0
+      treatment: "none"
+      status: "PENDING_MENTOR_REVIEW"
+
+  # ---------------------------------------------------------------
+  # Customer-level diagnostic block
+  # ---------------------------------------------------------------
+  # These aggregations are exploratory diagnostics. They are **not** the
+  # project's official RFM / extended-behavioural feature definitions
+  # (those belong to FE-04). They must not be promoted to the modelling
+  # pipeline as RFM features without mentor approval.
+  customer_diagnostic:
+    enabled: true
+    customer_key: "CustomerID"
+    aggregations:
+      total_spend:       { source: "LineRevenue",  fn: "sum" }
+      total_quantity:    { source: "Quantity",     fn: "sum" }
+      distinct_invoices: { source: "InvoiceNo",    fn: "nunique" }
+      distinct_products: { source: "StockCode",    fn: "nunique" }
+      active_days:       { source: "InvoiceDate",  fn: "nunique_date" }
+    detection:
+      iqr_multiplier: 1.5
+      percentile_thresholds: [95.0, 99.0, 99.5]
+    treatment: "none"
+    status: "PENDING_MENTOR_REVIEW"
+
+  # ---------------------------------------------------------------
+  # Filter modes
+  # ---------------------------------------------------------------
+  # The cleaned dataset is analysed once per mode so that
+  # cancellation / return rows do not silently contaminate the
+  # customer-behaviour analysis. The orchestrator emits a comparison
+  # between ALL ROWS and CLEAN PURCHASE for every feature.
+  filter_modes:
+    - { name: "all_rows",         where: "" }
+    - { name: "clean_purchase",   where: "IsCancellation == False and IsReturn == False" }
+    - { name: "non_cancellation", where: "IsCancellation == False" }
+    - { name: "non_return",       where: "IsReturn == False" }
+
+  # ---------------------------------------------------------------
+  # Sensitivity analysis
+  # ---------------------------------------------------------------
+  sensitivity:
+    enabled: true
+    thresholds: [1.5, 3.0]
+    percentiles: [99.0, 99.5, 99.9]
+
+  # ---------------------------------------------------------------
+  # Output paths and opt-in toggles
+  # ---------------------------------------------------------------
+  output:
+    processed_dir: "./data/processed"
+    report_dir: "./reports/fe03"
+    treated_filename: "transactions_outlier_treated.parquet"
+    write_treated_dataset: false
+    plots_dir: "./reports/fe03/plots"
+    write_plots: true
+
+  # ---------------------------------------------------------------
+  # Metadata (informational)
+  # ---------------------------------------------------------------
+  metadata:
+    stage: "FE-03"
+    rule_status_legend:
+      WORKING_ASSUMPTION: "Detection parameter is wired up; no treatment applied."
+      PENDING_MENTOR_REVIEW: "Detection is wired up but the treatment decision is not adopted."
+    notes:
+      - "FE-03 is exploratory: default treatment is 'none'."
+      - "Customer-level outputs are diagnostic-only; not RFM."
+      - "Raw data and FE-02 outputs are read-only; SHA-256 verified before and after the run."
+      - "A treated dataset is only written when output.write_treated_dataset=true AND --write-treated is passed."

@@ -1,9 +1,13 @@
 """K-Medoids clustering wrapper.
 
-TODO
-----
-- Implement `fit_kmedoids(X, k_range, metric, init)` using scikit-learn-extra
-  if available, otherwise a documented fallback.
+STATUS: OUT OF SCOPE (per ADR-0003)
+=====================================
+K-Medoids is NOT in the current benchmark scope. The five algorithms
+benchmarked are: K-Means, Agglomerative, DBSCAN, GMM, Fuzzy C-Means.
+See docs/decisions/0003-algorithm-scope.md for the full decision rationale.
+
+This file is retained as a placeholder. It may be reactivated for a
+future research phase via a new ADR.
 """
 
 from __future__ import annotations

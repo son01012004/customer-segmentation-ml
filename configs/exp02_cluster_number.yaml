@@ -1,0 +1,273 @@
+# ---------------------------------------------------------------------------
+# EXP-02 — Cluster Number Survey Configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the EXP-02 cluster number survey experiment.
+# Not used by EPIC-06 framework or EXP-01 baseline.
+#
+# EXP-02 scope:
+#   - Survey ảnh hưởng của số lượng cluster/component (K) cho các thuật toán
+#     có tham số K (K-Means, Agglomerative, GMM, Fuzzy C-Means).
+#   - Tạo metric curves (silhouette / Davies-Bouldin / Calinski-Harabasz /
+#     WCSS theo K) phục vụ EPIC-08.
+#   - Tạo tập candidate cluster numbers có evidence (KHÔNG phải best/optimal/final K).
+#   - Ghi nhận reproducible metadata cho mỗi (algorithm, K) combination.
+#
+# EXP-02 does NOT:
+#   - Rank algorithms (EPIC-08 scope).
+#   - Pick "best K" / "optimal K" / "final K" / "recommended K".
+#   - Sweep non-K hyperparameters (e.g. linkage, covariance_type, fuzziness).
+#   - Do stability analysis (EXP-05 / EPIC-08 scope).
+#   - Do customer profiling (EPIC-09 scope).
+#   - Compute ARI/AMI across seeds (EPIC-08 scope).
+#
+# Pipeline boundary:
+#   - Reuses EXP-01 working defaults for non-K hyperparameters.
+#   - Reuses EXP-01 metrics layer (silhouette, DBI, CH, WCSS) verbatim.
+#   - Reuses ML-01 ExperimentRunner and ClusterResult schema unchanged.
+#   - Does NOT mutate FE-06 input dataset or customer metadata.
+# ---------------------------------------------------------------------------
+
+exp02:
+  name: "EXP-02 Cluster Number Survey"
+  description: >
+    Controlled survey of cluster/component number K for the four
+    K-parameterized algorithms in the EPIC-06 benchmark set.
+    Produces metric curves (silhouette, DBI, CH, WCSS) versus K and
+    evidence-based candidate cluster numbers for downstream stages.
+    Does NOT rank algorithms, does NOT pick best K, does NOT do stability.
+
+  # -----------------------------------------------------------------------
+  # Dataset identity (read-only)
+  # -----------------------------------------------------------------------
+  dataset:
+    # MUST match the FE-06 final clustering dataset verbatim.
+    # Version is recorded as "FE06-v1.0" — same as the framework config.
+    # Recorded SHA-256 is captured at run-time (input SHA verification).
+    version: "FE06-v1.0"
+    final_clustering_dataset_path: "./data/processed/final_clustering_dataset.parquet"
+    customer_metadata_path: "./data/processed/customer_metadata.parquet"
+    customer_key: "CustomerID"
+
+  # -----------------------------------------------------------------------
+  # Feature set
+  # -----------------------------------------------------------------------
+  # PENDING_REVIEW (EXP02-FS-01): Repo currently exposes FE-06 final
+  # clustering dataset only as the full Extended RFM (14-feature) matrix.
+  # No RFM-only parquet artifact is present in the repository. EXP-02
+  # therefore runs the K-sweep on the Extended RFM feature set only.
+  # RQ2 dimension (RFM-only vs RFM-Extended comparison) requires a
+  # separate FE-06 sub-artifact that EXP-02 does NOT have authority
+  # to create.
+  # When/if an RFM-only parquet is added by FE-06 (ADR required), this
+  # config MUST add an entry to feature_sets below and the CLI must
+  # emit a separate run for the new feature set.
+  feature_sets:
+    - name: "rfm_extended"
+      description: >
+        Full FE-06 final clustering matrix (14 features: Recency,
+        Frequency, Monetary, TotalQuantity, AverageQuantity, BasketSize,
+        TenureDays, PurchaseIntervalMean, PurchaseIntervalStd, ActiveDays,
+        AverageInvoiceValue, ProductsPerInvoice, CancellationRate,
+        ReturnRate). This is the SINGLE feature set EXP-02 currently
+        has access to.
+      # Run K-sweep ON this feature set
+      run_k_sweep: true
+
+  # -----------------------------------------------------------------------
+  # Algorithms participating in the K-sweep
+  # -----------------------------------------------------------------------
+  # K is the survey variable. Non-K hyperparameters are held fixed at the
+  # EXP-01 working defaults (see working_defaults section below).
+  # DBSCAN has no n_clusters parameter; it is recorded as a diagnostic
+  # entry only (one run) and is NOT part of the K-sweep.
+  algorithms:
+    # K-as-n_clusters family
+    - name: "kmeans"
+      has_k: true
+      k_param: "n_clusters"
+    - name: "agglomerative"
+      has_k: true
+      k_param: "n_clusters"
+    - name: "fuzzy_cmeans"
+      has_k: true
+      k_param: "n_clusters"
+    # K-as-n_components family
+    - name: "gmm"
+      has_k: true
+      k_param: "n_components"
+    # Diagnostic only — no K parameter
+    - name: "dbscan"
+      has_k: false
+      k_param: null
+
+  # -----------------------------------------------------------------------
+  # K range (WORKING_ASSUMPTION — PENDING_REVIEW)
+  # -----------------------------------------------------------------------
+  # Mirrors configs/clustering.yaml `algorithms.*.k_range: [2, 10]`.
+  # This range is a WORKING_ASSUMPTION, not a final research decision.
+  # Mentor/human researcher MUST approve before any downstream stage
+  # uses these K values as final.
+  k_range:
+    min: 2
+    max: 10
+    step: 1
+    rationale: >
+      Mirrors k_range in configs/clustering.yaml for the K-parameterized
+      algorithms. Step=1 gives a fine-grained sweep (K=2..10 inclusive).
+      Bounds chosen because: K=1 is trivially one-cluster (no internal
+      metric is defined); K=10 is the upper bound specified by the
+      framework's existing working_assumption.
+    status: "WORKING_ASSUMPTION"
+
+  # -----------------------------------------------------------------------
+  # Working defaults (mirror EXP-01 / configs/exp01_baseline.yaml)
+  # -----------------------------------------------------------------------
+  # Non-K hyperparameters are kept fixed at EXP-01 working defaults.
+  # Only the K-bearing parameter is varied per (algorithm, K) combination.
+  working_defaults:
+    kmeans:
+      init: "k-means++"
+      n_init: 10
+      max_iter: 300
+      tol: 1.0e-4
+    agglomerative:
+      linkage: "ward"
+      metric: "euclidean"
+      compute_distances: true
+    gmm:
+      covariance_type: "full"
+      init_params: "kmeans"
+      tol: 1.0e-3
+      reg_covar: 1.0e-6
+      max_iter: 100
+      n_init: 1
+    fuzzy_cmeans:
+      m: 2.0
+      max_iter: 300
+      error: 1.0e-4
+    dbscan:
+      eps: 0.5
+      min_samples: 5
+      metric: "euclidean"
+
+  # -----------------------------------------------------------------------
+  # Runtime protocol (mirror EXP-01 section 3)
+  # -----------------------------------------------------------------------
+  runtime:
+    # n_repeat per (algorithm, K) — measures algorithm execution time
+    # with statistics. Not stability analysis. Same seed across repetitions.
+    repeat: 5
+    seed: 42
+    # BaselineRunner reuses ExperimentRunner runtime measurement
+    # (algorithm execution only). Metric computation time and
+    # artifact/report writing time are excluded from runtime stats.
+
+  # -----------------------------------------------------------------------
+  # Metrics (re-uses EXP-01 metrics layer)
+  # -----------------------------------------------------------------------
+  metrics:
+    internal:
+      - silhouette
+      - davies_bouldin
+      - calinski_harabasz
+      - wcss
+    # Status semantics: VALID_VALUE / NOT_APPLICABLE / COMPUTATION_ERROR / MISSING.
+    # EXP-01 policy applies verbatim, including DBSCAN noise handling.
+    status_policy: "exp01_mirror"
+    # WCSS uses arithmetic centroid from hard labels (GMM/FCM: argmax
+    # of soft outputs, NOT GMM Gaussian means or FCM fuzzy centroids).
+    wcss_centroid: "arithmetic_hard_labels"
+
+  # -----------------------------------------------------------------------
+  # Candidate cluster number heuristic (evidence-based)
+  # -----------------------------------------------------------------------
+  # EXP-02 produces a candidate cluster-numbers table. This is NOT a
+  # final K selection. The candidate set is built by aggregating EVIDENCE
+  # from the metric curves using transparent, deterministic heuristics:
+  #   - For each algorithm × feature_set:
+  #     1. Identify K values whose silhouette is in the top-N of the
+  #        algorithm's K sweep (k_high_silhouette).
+  #     2. Identify K values whose DBI is in the bottom-N (k_low_dbi).
+  #     3. Identify K values whose CH is in the top-N (k_high_ch).
+  #     4. Identify K values with significant WCSS-drop ratios
+  #        (k_elbow).
+  #   - The candidate set is the union of the above (per algorithm).
+  #   - "agreement" metric: number of evidence indicators that flag
+  #     a given K; values >= min_agreement_count appear in the candidate set.
+  #
+  # These heuristics DO NOT declare a winner. They only suggest K values
+  # worth inspecting. Mentor/human researcher owns final selection.
+  candidate_heuristic:
+    top_n_per_indicator: 3      # top-3 silhouette, bottom-3 DBI, top-3 CH
+    elbow_drop_ratio_threshold: 0.2   # WCSS drop >= 20% from previous K
+    # A K must be flagged by at least this many indicators to be a candidate.
+    min_agreement_count: 2
+    status: "WORKING_ASSUMPTION"
+
+  # -----------------------------------------------------------------------
+  # Visualization policy
+  # -----------------------------------------------------------------------
+  # Factual diagnostic plots only. No business interpretation, no segment
+  # labeling, no colour-based segmentation storytelling.
+  visualization:
+    enabled: true
+    # Plot artifact directory (created at run-time).
+    figures_dir: "./reports/exp02/figures"
+    # Files to generate (per algorithm × metric).
+    plots:
+      - "wcss_vs_k"
+      - "silhouette_vs_k"
+      - "davies_bouldin_vs_k"
+      - "calinski_harabasz_vs_k"
+    # PNG format; dpi matches research-report convention.
+    image_format: "png"
+    dpi: 110
+
+  # -----------------------------------------------------------------------
+  # Output
+  # -----------------------------------------------------------------------
+  output:
+    reports_dir: "./reports/exp02"
+    # Canonical algorithm order in reports (from EXP-01 baseline).
+    canonical_algorithm_order:
+      - kmeans
+      - agglomerative
+      - dbscan
+      - gmm
+      - fuzzy_cmeans
+
+  # -----------------------------------------------------------------------
+  # Decision status fields
+  # -----------------------------------------------------------------------
+  decision_status:
+    k_range: "WORKING_ASSUMPTION"
+    candidate_heuristic: "WORKING_ASSUMPTION"
+    feature_set_coverage: "ONLY_RFM_EXTENDED"
+    next_stage_owner: "EPIC-08 / EPIC-09"
+
+  # -----------------------------------------------------------------------
+  # Scope boundaries
+  # -----------------------------------------------------------------------
+  scope_boundaries:
+    - "Survey K for K-parameterized algorithms only (K-Means, Agglomerative, GMM, Fuzzy C-Means)."
+    - "DBSCAN is recorded as a diagnostic entry only; not part of K-sweep."
+    - "Non-K hyperparameters held fixed at EXP-01 working defaults."
+    - "Metric layer is the EXP-01 metrics.py layer — reused verbatim."
+    - "WCSS uses arithmetic centroid from hard labels."
+    - "DBSCAN noise handling follows EXP-01 (exclude noise from internal metrics and WCSS)."
+    - "Random seed protocol mirrors EXP-01 (single seed 42 across n_repeat)."
+
+  pending_review_notes:
+    - "EXP02-KRNG-01: K range [2, 10], step=1 (WORKING_ASSUMPTION)."
+    - "EXP02-FS-01: RFM-only feature set NOT present in repo; EXP-02 runs on RFM Extended only."
+    - "EXP02-CDHC-01: Candidate-cluster heuristic constants (top_n=3, drop_ratio=0.2, min_agreement=2) are WORKING_ASSUMPTION."
+    - "EXP02-DBSCAN-01: DBSCAN contribution to candidate set is via the baseline diagnostic only."
+    - "EXP02-METRIC-01: Metric status semantics mirror EXP-01 (no new metric introduced)."
+    - "EXP02-REPRO-01: Same seed across all (algorithm, K) repetitions; this is NOT stability analysis."
+
+  assumptions:
+    - "FE-06 final clustering matrix is READ-ONLY during EXP-02."
+    - "CustomerID is in metadata only; the matrix never contains identifiers."
+    - "EXP-01 working defaults are accepted as WORKING_ASSUMPTION (mirrored by EXP-02)."
+    - "DBSCAN's discovered cluster count is reported as a single diagnostic entry; not swept across eps/min_samples."

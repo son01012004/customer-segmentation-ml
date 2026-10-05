@@ -127,6 +127,16 @@ logs/
 !/reports/evaluation/.gitkeep
 !/reports/figures/.gitkeep
 
+# Generated algorithm comparison artifacts (per AGENTS.md §2.12).
+# Source of truth: 9 PNGs are reproducible from
+# docs/research/ALGORITHM_THEORY_AND_EXPERIMENTAL_COMPARISON.md +
+# the audit numbers in reports/{exp01,exp03,exp05}/*.csv. Therefore the
+# PNGs themselves are NOT committed. Only the .gitkeep is tracked so
+# the directory structure is preserved across clones.
+/reports/algorithm_comparison/**
+!/reports/algorithm_comparison/
+!/reports/algorithm_comparison/.gitkeep
+
 # Local caches
 .cache/
 .mypy_cache/

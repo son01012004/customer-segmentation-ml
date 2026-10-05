@@ -1,0 +1,350 @@
+# ---------------------------------------------------------------------------
+# EXP-04 — Preprocessing & Feature Set Sensitivity Configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for EXP-04 (Preprocessing & Feature Set
+# Sensitivity Analysis).
+#
+# EXP-04 Plan Revision 2 (approved for implementation 2026-09-21).
+#
+# EXP-04-v1 scope:
+#   Family A — Feature Set Sensitivity (RFM vs RFM Extended): DEFERRED.
+#     RFM-only clustering-ready dataset is not present in the
+#     repository. EXP-04 does NOT create an RFM-only ad-hoc
+#     artifact. Ownership of RFM-only materialization belongs to
+#     FE-06 / future ADR.
+#   Family B — Preprocessing Sensitivity (transformation x scaling)
+#     on the RFM Extended feature set: EXECUTED. Six full-matrix
+#     scenarios (C0, C1, C2, C3, C6, C7) reusing FE-06 working
+#     configuration matrix and FE-06 fitted median imputation values.
+#
+# EXP-04 does NOT:
+#   - Rank algorithms.
+#   - Pick "best" / "optimal" / "superior" / "winner" / "recommended"
+#     / "final" scenario.
+#   - Compute composite / weighted scores.
+#   - Re-sweep K = 2..10 (K is fixed at 4 = CONTROLLED_REFERENCE_K).
+#   - Stability analysis (EPIC-08 scope).
+#   - ARI / AMI / bootstrap stability (EPIC-08 scope).
+#   - Customer profiling (EPIC-09 scope).
+#   - Create RFM-only dataset.
+#   - Mutate FE-05 / FE-06 outputs.
+#
+# Algorithm control:
+#   - CONTROLLED_REFERENCE_ALGORITHM = kmeans
+#   - CONTROLLED_REFERENCE_HYPERPARAMETERS = EXP-01 working defaults
+#     (init=k-means++, n_init=10, max_iter=300, tol=1.0e-4)
+#   - CONTROLLED_REFERENCE_K = 4
+#   - EXP-03 working/selected configurations are NOT used here.
+#
+# Reproducibility:
+#   - Repeated execution (n_repeat=5, seed=42) is REPRODUCIBILITY
+#     verification, NOT stability analysis. labels_hash and metric
+#     values are expected to be identical across repeats because the
+#     algorithm is seeded; only runtime varies (wall-clock).
+#
+# Hard constraints (AGENTS.md, FE-06 contract):
+#   - FE-05 / FE-06 outputs are READ-ONLY. SHA-256 verified before
+#     and after EXP-04 execution.
+#   - EXP-04 re-fits preprocessing primitives in memory only; fitted
+#     pipeline files are NOT persisted as FE-06 artifacts.
+#
+# ---------------------------------------------------------------------------
+
+exp04:
+  name: "EXP-04 Preprocessing & Feature Set Sensitivity"
+  description: >
+    Controlled sensitivity analysis of preprocessing configurations on
+    the RFM Extended feature set. Six full-matrix scenarios
+    (transformation x scaling) with K-Means as the
+    CONTROLLED_REFERENCE_ALGORITHM. The RFM-only family is DEFERRED
+    pending FE-06 materialization.
+
+  # -----------------------------------------------------------------------
+  # Dataset identity (read-only references)
+  # -----------------------------------------------------------------------
+  dataset:
+    version: "FE06-v1.0"
+    # FE-05 source used by EXP-04 to re-apply imputation + scenario
+    # preprocessing. EXP-04 does NOT use final_clustering_dataset
+    # (C7-only) as the source because we need a pre-C7 matrix.
+    customer_candidates_path: "./data/processed/customer_candidates.parquet"
+    customer_candidates_sha256: "df5333fba95a48d4fe92b1136b3654d06c631f5e65313d6a34a1c15557225649"
+    # CustomerID metadata for label alignment (READ-ONLY).
+    customer_metadata_path: "./data/processed/customer_metadata.parquet"
+    customer_metadata_sha256: "c2a42b3c8b035dcf6a5af8e4b6afb6a444099e6ad0e12a271ea59d95c7382ad2"
+    customer_key: "CustomerID"
+
+  # -----------------------------------------------------------------------
+  # Feature set (Family B only)
+  # -----------------------------------------------------------------------
+  feature_set:
+    name: "rfm_extended"
+    description: >
+      FE-06 14-feature extended RFM matrix (Recency, Frequency,
+      Monetary, TotalQuantity, AverageQuantity, BasketSize,
+      TenureDays, PurchaseIntervalMean, PurchaseIntervalStd,
+      ActiveDays, AverageInvoiceValue, ProductsPerInvoice,
+      CancellationRate, ReturnRate).
+    feature_order:
+      - Recency
+      - Frequency
+      - Monetary
+      - TotalQuantity
+      - AverageQuantity
+      - BasketSize
+      - TenureDays
+      - PurchaseIntervalMean
+      - PurchaseIntervalStd
+      - ActiveDays
+      - AverageInvoiceValue
+      - ProductsPerInvoice
+      - CancellationRate
+      - ReturnRate
+
+  # -----------------------------------------------------------------------
+  # Family A — Feature Set Sensitivity (DEFERRED)
+  # -----------------------------------------------------------------------
+  family_a:
+    name: "feature_set_sensitivity"
+    status: "DEFERRED"
+    deferred_reason: >
+      RFM-only clustering-ready dataset does not exist in the
+      repository. EXP-04 does NOT create an RFM-only ad-hoc dataset.
+      Materialization of an RFM-only parquet belongs to FE-06
+      (future ADR).
+    owner: "FE-06"
+    scenarios_blocked:
+      - id: "EXP04-FA-RFM"
+        feature_set: "rfm"
+        description: "RFM-only (Recency + Frequency + Monetary)"
+    rq2_completeness: "PARTIAL — preprocessing sensitivity completed; feature set sensitivity pending FE-06"
+
+  # -----------------------------------------------------------------------
+  # Family B — Preprocessing Sensitivity (EXECUTED)
+  # -----------------------------------------------------------------------
+  family_b:
+    name: "preprocessing_sensitivity"
+    status: "EXECUTED"
+    description: >
+      Six full-matrix preprocessing scenarios (transformation x
+      scaling) applied to the RFM Extended feature set. Imputation is
+      a CONTROLLED_VARIABLE (median values reused from FE-06 C7 fitted
+      imputer).
+
+  # -----------------------------------------------------------------------
+  # Scenario matrix (Family B, 6 full-matrix scenarios)
+  # -----------------------------------------------------------------------
+  # All six scenarios are full-matrix (applied to ALL 14 features in
+  # the RFM Extended set). Mixed / partial transformations (e.g.,
+  # log1p on non-negative features only) are NOT included; they
+  # would not be full-matrix comparable.
+  #
+  # C0 = NO_TRANSFORM_NO_SCALING_REFERENCE  (NOT best baseline)
+  # C1 = none + standard
+  # C2 = none + minmax
+  # C3 = none + robust
+  # C6 = yeo_johnson + standard
+  # C7 = FE06_WORKING_CONFIGURATION_REFERENCE  (yeo_johnson + robust)
+  scenarios:
+    - id: "EXP04-S01"
+      config_id: "C0"
+      role: "NO_TRANSFORM_NO_SCALING_REFERENCE"
+      transformation: "none"
+      scaling: "none"
+    - id: "EXP04-S02"
+      config_id: "C1"
+      role: "PREPROCESSING_CANDIDATE_SCENARIO"
+      transformation: "none"
+      scaling: "standard"
+    - id: "EXP04-S03"
+      config_id: "C2"
+      role: "PREPROCESSING_CANDIDATE_SCENARIO"
+      transformation: "none"
+      scaling: "minmax"
+    - id: "EXP04-S04"
+      config_id: "C3"
+      role: "PREPROCESSING_CANDIDATE_SCENARIO"
+      transformation: "none"
+      scaling: "robust"
+    - id: "EXP04-S05"
+      config_id: "C6"
+      role: "PREPROCESSING_CANDIDATE_SCENARIO"
+      transformation: "yeo_johnson"
+      scaling: "standard"
+    - id: "EXP04-S06"
+      config_id: "C7"
+      role: "FE06_WORKING_CONFIGURATION_REFERENCE"
+      transformation: "yeo_johnson"
+      scaling: "robust"
+
+  # -----------------------------------------------------------------------
+  # Imputation control
+  # -----------------------------------------------------------------------
+  # CONTROLLED_VARIABLE across all six scenarios. Reuses FE-06 C7
+  # fitted median values verbatim. EXP-04 does NOT introduce new
+  # imputation options; only `median` is supported.
+  imputation:
+    method: "median"
+    status: "CONTROLLED_REFERENCE_IMPUTATION"
+    rationale: >
+      Median is the only imputation method implemented in FE-06
+      v1.0 (C7 working). Reusing the fitted median values ensures
+      every scenario starts from the same imputed matrix before
+      transformation + scaling. Imputation is NOT a dimension of
+      EXP-04 sensitivity.
+    fitted_values:
+      # Verbatim from FE-06 fitted_preprocessing_pipeline.pkl.
+      # These values are NOT recomputed per scenario; they are the
+      # CONTROLLED_REFERENCE_IMPUTATION values for EXP-04.
+      PurchaseIntervalMean: 41.0
+      PurchaseIntervalStd: 32.58504379012092
+    applied_features:
+      - PurchaseIntervalMean
+      - PurchaseIntervalStd
+    unsupported_features: []  # No other feature has NaN at this stage.
+
+  # -----------------------------------------------------------------------
+  # Algorithm control
+  # -----------------------------------------------------------------------
+  algorithm:
+    name: "kmeans"
+    role: "CONTROLLED_REFERENCE_ALGORITHM"
+    hyperparameters:
+      n_clusters: 4             # CONTROLLED_REFERENCE_K
+      init: "k-means++"
+      n_init: 10
+      max_iter: 300
+      tol: 1.0e-4
+      random_state: 42
+    rationale: >
+      K-Means is the most widely used distance-based clustering
+      baseline. Fixing K-Means (and its EXP-01 working-default
+      hyperparameters) as the CONTROLLED_REFERENCE_ALGORITHM
+      removes algorithm variance from the attribution, so observed
+      differences across scenarios can be attributed to the
+      preprocessing configuration alone.
+    not_used:
+      - "agglomerative"
+      - "dbscan"
+      - "gmm"
+      - "fuzzy_cmeans"
+    not_using_exp03_selected: >
+      EXP-03 working/selected configurations are NOT reused as
+      EXP-04 hyperparameters. EXP-03 K-Means K=3 tied selection is
+      NOT used (K is fixed at 4 = CONTROLLED_REFERENCE_K).
+
+  # -----------------------------------------------------------------------
+  # Repeated execution (reproducibility verification, NOT stability)
+  # -----------------------------------------------------------------------
+  repeated_execution:
+    seed: 42
+    n_repeat: 5
+    status: "REPRODUCIBILITY_VERIFICATION"
+    not_status: "STABILITY_ANALYSIS"
+    determinism_expectation: >
+      With seed=42 + n_init=10 + max_iter=300 + tol=1e-4,
+      K-Means is deterministic. Therefore across n_repeat=5, all
+      repeated fits in the same scenario MUST produce identical
+      cluster_labels (verified by labels_hash) and identical
+      silhouette / DBI / CH / WCSS values. Only runtime_seconds
+      (wall-clock) is allowed to vary.
+    determinism_verification:
+      enabled: true
+      action_on_failure: >
+        If labels_hash or any metric value differs across repeats,
+        set determinism_verified=False for that scenario, record
+        evidence in evidence_note, do NOT modify the underlying
+        results to force pass, and mark the scenario PENDING_REVIEW.
+
+  # -----------------------------------------------------------------------
+  # Decision status taxonomy
+  # -----------------------------------------------------------------------
+  # Only the following labels are permitted in EXP-04 outputs.
+  decision_status:
+    permitted:
+      - "CANDIDATE_SCENARIO"
+      - "TIED_SCENARIOS"
+      - "PENDING_REVIEW"
+      - "DEFERRED"
+    forbidden:
+      - "BEST"
+      - "OPTIMAL"
+      - "WINNER"
+      - "SUPERIOR"
+      - "RECOMMENDED"
+      - "FINAL"
+    default_for_successful_deterministic_scenario: "CANDIDATE_SCENARIO"
+
+  # -----------------------------------------------------------------------
+  # Output artifacts
+  # -----------------------------------------------------------------------
+  output:
+    report_dir: "./reports/exp04"
+    artifacts:
+      - "exp04_manifest.json"
+      - "exp04_run_summary.json"
+      - "exp04_scenario_results.csv"
+      - "exp04_preprocessing_sensitivity.csv"
+      - "exp04_analysis.md"
+      - "exp04_deferred.json"
+      - "exp04_pending_review.json"
+
+  # -----------------------------------------------------------------------
+  # Metadata
+  # -----------------------------------------------------------------------
+  metadata:
+    stage: "EXP-04"
+    plan_revision: "R2"
+    task_description: >
+      Controlled preprocessing sensitivity analysis (Family B) on the
+      RFM Extended feature set with K-Means as
+      CONTROLLED_REFERENCE_ALGORITHM. Family A (Feature Set
+      Sensitivity) is DEFERRED pending FE-06 materialization.
+    scope_boundaries:
+      - "Family A (Feature Set Sensitivity) DEFERRED"
+      - "Family B (Preprocessing Sensitivity) EXECUTED on RFM Extended"
+      - "Six full-matrix preprocessing scenarios (C0..C7 minus C4/C5)"
+      - "K-Means as CONTROLLED_REFERENCE_ALGORITHM"
+      - "K = 4 as CONTROLLED_REFERENCE_K"
+      - "Median imputation as CONTROLLED_REFERENCE_IMPUTATION (FE-06 C7 fitted values)"
+      - "REPRODUCIBILITY_VERIFICATION via n_repeat=5, seed=42"
+      - "Determinism verification per scenario (labels_hash + metrics)"
+      - "Decision status taxonomy: CANDIDATE_SCENARIO / TIED_SCENARIOS / PENDING_REVIEW / DEFERRED"
+      - "FE-05 / FE-06 outputs READ-ONLY (SHA verified)"
+    notes:
+      - "EXP-04 does NOT introduce composite scoring."
+      - "EXP-04 does NOT rank algorithms."
+      - "EXP-04 does NOT rerun K-sweep."
+      - "EXP-04 does NOT create RFM-only dataset."
+      - "EXP-04 does NOT use EXP-03 selected configurations."
+      - "EXP-04 does NOT stability analysis."
+      - "EXP-04 re-fits scenario pipelines in memory; fitted pipeline files NOT persisted to data/processed/."
+    pending_review_notes:
+      - id: "EXP04-FS-01"
+        decision: "RFM-only dataset does not exist -> Family A DEFERRED"
+        owner: "FE-06"
+        status: "DEFERRED / PENDING_FE06_MATERIALIZATION"
+      - id: "EXP04-FS-02"
+        decision: "FE-06 ADR for RFM-only materialization"
+        owner: "FE-06"
+        status: "PENDING_REVIEW"
+      - id: "EXP04-FS-03"
+        decision: "EXP-04-v1 does not claim RQ2 completeness for feature representation"
+        owner: "FE-06"
+        status: "PENDING_REVIEW"
+      - id: "EXP04-ALG-01"
+        decision: "K-Means only as CONTROLLED_REFERENCE_ALGORITHM"
+        status: "PENDING_REVIEW"
+      - id: "EXP04-K-01"
+        decision: "K = 4 (CONTROLLED_REFERENCE_K); no K-sweep"
+        status: "PENDING_REVIEW"
+      - id: "EXP04-IMP-01"
+        decision: "Median imputation with FE-06 C7 fitted values (CONTROLLED_REFERENCE_IMPUTATION)"
+        status: "PENDING_REVIEW"
+      - id: "EXP04-TR-01"
+        decision: "log1p NOT included (not full-matrix comparable)"
+        status: "PENDING_REVIEW"
+      - id: "EXP04-CONCL-01"
+        decision: "Decision status taxonomy: CANDIDATE_SCENARIO / TIED_SCENARIOS / PENDING_REVIEW / DEFERRED"
+        status: "PENDING_REVIEW"
