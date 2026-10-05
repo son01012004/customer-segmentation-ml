@@ -5,8 +5,8 @@ Copilot, Claude, custom agents, or any contributor) working on this
 repository.
 
 These rules are binding for the foundation phase and for every later
-stage (FE-01, preprocessing, RFM, extended features, clustering,
-evaluation, profiling, visualization).
+stage (FE-01, preprocessing, RFM, extended features, transformation,
+clustering, evaluation, profiling, visualization).
 
 If a rule here ever needs to change, the change must be made in a Pull
 Request that is reviewed and recorded as an ADR in
@@ -31,88 +31,224 @@ and ask the human lead for clarification instead of guessing.
 
 ---
 
-## 2. Hard constraints (DO NOT violate)
+## 2. Global principles (apply to every phase)
 
-The following are **non-negotiable** for every agent action in this
-repository.
+These principles are **universal**. They must be honoured across FE-01,
+preprocessing, RFM, feature engineering, transformation, clustering,
+evaluation, profiling, visualization, and any future stage.
 
 ### 2.1 Research integrity
 
-- **Do not** modify the research questions in `docs/methodology/`.
-- **Do not** modify the research methodology, unit of analysis, or
-  benchmarking protocol.
-- **Do not** modify the four benchmark algorithms: K-Means, K-Medoids,
-  Agglomerative Clustering, DBSCAN. They are fixed by the methodology.
-- **Do not** invent, fabricate, or estimate dataset statistics,
-  hyperparameters, cluster counts, evaluation metrics, or any other
-  numerical research result.
-- **Do not** call any algorithm "best", "winning", or "recommended" until
-  the full evaluation framework has been executed and documented in
-  `docs/experiment_logs/`.
+- Không được invent data, kết quả thí nghiệm, tham khảo/tài liệu,
+  hoặc kết luận nghiên cứu.
+- Không được thay đổi research methodology một cách âm thầm.
+- Không được tự đổi WORKING_ASSUMPTION thành FINAL_DECISION.
+- Mọi quyết định methodology chưa được approve phải được đánh dấu rõ:
+  `WORKING_ASSUMPTION` hoặc `MENTOR_REVIEW_PENDING` tuỳ context.
+- Không được tự ý thay đổi research questions trong `docs/methodology/`,
+  unit of analysis, hoặc benchmarking protocol.
+- Không được sửa benchmark algorithms cố định bởi methodology
+  (K-Means, Agglomerative Clustering, DBSCAN, Gaussian Mixture Model, Fuzzy C-Means).
+  K-Medoids is OUT OF SCOPE (per ADR-0003).
+- Không được gọi thuật toán/feature nào là "best", "winning",
+  "recommended", "optimal" trước khi full evaluation framework đã chạy
+  và được ghi vào `docs/experiment_logs/`.
 
-### 2.2 Data privacy
+Nếu ambiguity có thể ảnh hưởng research methodology → **dừng** và báo
+cáo cho human researcher.
 
-- **Do not** commit raw datasets (`data/raw/**`), interim data
-  (`data/interim/**`), processed data (`data/processed/**`), or external
-  data (`data/external/**`) to Git.
-- **Do not** delete or move the primary dataset from
-  `data/raw/primary/Online Retail.xlsx` without an explicit user request
-  recorded as an ADR.
-- **Do not** add new datasets without recording provenance (source URL,
-  license, SHA-256) in `configs/dataset.yaml` and the relevant ADR.
-- **Do not** commit generated reports or figures under `reports/**`.
+Nếu chỉ là technical implementation ambiguity không ảnh hưởng
+methodology → có thể dùng convention hiện có của repository và ghi rõ
+trong implementation notes.
 
-### 2.3 Code organization
+### 2.2 Phase isolation
 
-- All reusable logic must live in `src/customer_segmentation/`.
-- Notebooks (`notebooks/`) are for exploration, reporting, and
-  communication only. They must import from `src/`, not duplicate logic.
-- Public functions and classes must have docstrings and type hints.
-- New public behavior must come with at least one unit test under
-  `tests/`.
+Mỗi phase:
 
-### 2.4 Scope discipline
+- Chỉ implement đúng approved plan của phase đó.
+- Có thể READ output của phase trước.
+- **Không** được tự ý MODIFY output của phase trước.
+- **Không** được sửa methodology của phase trước.
+- **Không** được mở rộng scope sang phase sau.
 
-- **Do not** start a task that has not been explicitly assigned. For
-  example, if FE-01 is the next stage, do not jump ahead into
-  preprocessing, clustering, evaluation, profiling, or visualization
-  unless the user has explicitly requested that scope.
-- **Do not** edit files outside the scope of the assigned task. If an
-  out-of-scope fix is required, mention it in the PR description and let
-  the human reviewer decide.
-- **Do not** rewrite large portions of files when a smaller change is
-  sufficient.
+Nếu phase sau cần thay đổi output phase trước → báo cáo và chờ
+human decision.
 
-### 2.5 Reproducibility
+### 2.3 Data integrity
 
-- All experiments must be logged in `docs/experiment_logs/` with: config
-  hash, random seed, environment info, raw dataset SHA-256, and paths to
-  generated artifacts.
-- Random seeds must come from `configs/experiment.yaml` (or a
-  stage-specific config), never from a hard-coded literal in code.
+Dataset đầu vào của một phase phải:
 
-### 2.6 Decisions and provenance
+- Được READ-ONLY nếu plan yêu cầu.
+- Được kiểm tra schema.
+- Được kiểm tra row count khi phù hợp.
+- Được kiểm tra SHA-256 khi phase yêu cầu reproducibility/integrity.
+- Không được mutate silently.
 
-- Every meaningful methodology or engineering decision must be recorded
-  as an ADR in `docs/decisions/` using the template in that directory.
-- The ADRs already in `docs/decisions/` are **immutable**. To reverse a
-  decision, write a *new* ADR that supersedes the old one.
-- The data dictionary in `docs/data_dictionary/` is the canonical source
-  of column semantics. If a column is referenced in code or report, its
-  meaning must already be documented there (or referenced via an ADR
-  that fills the gap).
+**Không** được sửa raw/processed dataset chỉ để test pass hoặc SHA khớp.
 
-### 2.7 Git hygiene
+Nếu phát hiện dataset discrepancy → investigate, report, không tự
+overwrite.
 
-- **Do not** run `git commit`, `git push`, `git add`, or any other
-  state-changing Git command unless the user explicitly asks for it.
-- **Do not** create or modify a remote (`git remote add`, `git remote
-  set-url`), or create a GitHub repository on behalf of the user.
-- Branch changes are out of scope unless explicitly requested.
+### 2.4 Scope control
+
+Không tự thêm vào scope phase hiện tại:
+
+- clustering
+- scaling
+- transformation
+- model training
+- evaluation
+- hyperparameter tuning
+- visualization
+- deployment
+- PR / documentation artifact ngoài scope
+
+trừ khi approved plan của phase hiện tại yêu cầu rõ ràng.
+
+Không tự "cải tiến" methodology.
+
+### 2.5 Research decision language
+
+Không tự dùng các từ: `best`, `worst`, `recommended`, `optimal`,
+`superior`, `final`, `winner` để mô tả feature, algorithm, model hoặc
+methodology nếu chưa có basis/approval phù hợp.
+
+Nếu chỉ là candidate, dùng đúng semantics của phase:
+
+- `CANDIDATE`
+- `RETAIN_CANDIDATE`
+- `PENDING_REVIEW`
+- `EXCLUDE`
+- `ADJUST`
+- `UNSUPPORTED`
+
+`RETAIN_CANDIDATE` **không** đồng nghĩa `FINAL`.
+
+### 2.6 Feature / model selection
+
+Không tạo:
+
+- numerical score
+- ranking
+- weight
+- winner
+- "best model"
+
+nếu approved plan không yêu cầu và không có methodology rõ ràng.
+
+Selection phải dựa trên evidence/criteria đã được approve.
+
+### 2.7 Reproducibility
+
+Mỗi implementation phase nên ghi nhận khi phù hợp:
+
+- input dataset/version
+- input SHA-256
+- output SHA-256
+- configuration
+- feature list
+- parameters
+- random seed nếu có
+- execution metadata
+- assumptions
+- pending decisions
+
+Không invent metadata.
+
+### 2.8 Validation
+
+Trước khi kết thúc một implementation phase, agent cần chạy các bước
+validation phù hợp với scope:
+
+- Tests phù hợp với phase (`pytest`).
+- Lint (`ruff check`).
+- Format check (`black --check`).
+- Pipeline trên dataset thật nếu scope yêu cầu.
+- Kiểm tra output schema, row count, duplicates.
+- Kiểm tra missing / error conditions khi phù hợp.
+- Kiểm tra reproducibility metadata (input/output SHA, config hash,
+  random seed, environment).
+- Kiểm tra các hard constraint của phase đó (xem §3).
+
+**Pre-existing failure:**
+
+- Phân biệt rõ lỗi do implementation hiện tại với lỗi pre-existing
+  trong repository.
+- Không che giấu.
+- Không tự nhận là PASS nếu còn failure chưa được giải thích.
+- Pre-existing failure được ghi nhận trong completion summary của phase,
+  không bị sửa ngoài scope.
+
+### 2.9 No silent policy changes
+
+Không tự đổi:
+
+- dataset
+- filtering policy
+- missing-value policy
+- outlier policy
+- cancellation/return treatment
+- feature definition
+- reference date
+- clustering algorithm
+- evaluation metric
+- transformation
+- scaling
+- threshold
+
+nếu thay đổi đó ảnh hưởng methodology. Phải report trước.
+
+### 2.10 Human approval gate
+
+AI Agent không được tự coi một phase là "academically approved" chỉ vì
+code chạy, tests pass, metrics đẹp, hoặc report hoàn thành.
+
+Phân biệt rõ:
+
+- `TECHNICALLY IMPLEMENTED` — agent đã implement và verify.
+- `RESEARCH DECISION APPROVED` — mentor/human researcher đã approve
+  các vấn đề methodology.
+
+Mentor/human researcher quyết định các vấn đề methodology.
+
+### 2.11 Git
+
+AI Agent:
+
+- **KHÔNG** commit.
+- **KHÔNG** push.
+- **KHÔNG** tạo Pull Request.
+- **KHÔNG** merge.
+- **KHÔNG** thay đổi branch strategy.
+
+Human researcher chịu trách nhiệm Git operations.
+
+### 2.12 Data privacy
+
+- **Không** commit raw datasets (`data/raw/**`), interim data
+  (`data/interim/**`), processed data (`data/processed/**`), hoặc
+  external data (`data/external/**`) vào Git.
+- **Không** xóa hoặc di chuyển primary dataset
+  `data/raw/primary/Online Retail.xlsx` mà không có explicit user
+  request được ghi vào ADR.
+- **Không** thêm dataset mới mà không ghi provenance (source URL,
+  license, SHA-256) vào `configs/dataset.yaml` và ADR tương ứng.
+- **Không** commit generated reports / figures dưới `reports/**`.
+
+### 2.13 Code organization
+
+- Tất cả reusable logic phải nằm trong `src/customer_segmentation/`.
+- Notebooks (`notebooks/`) chỉ dùng cho exploration, reporting,
+  communication. Phải import từ `src/`, không duplicate logic.
+- Public functions/classes phải có docstrings và type hints.
+- Public behavior mới phải có ít nhất một unit test dưới `tests/`.
 
 ---
 
 ## 3. Stage-by-stage guardrails
+
+Đây là các forbidden actions cụ thể cho từng phase. Nếu một phase không
+liệt kê trong bảng dưới, agent vẫn phải tuân thủ §2.
 
 | Stage             | Forbidden actions                                                                   |
 | ----------------- | ----------------------------------------------------------------------------------- |
@@ -164,3 +300,60 @@ If at any point an agent:
 
 …then the agent must **stop**, surface the issue clearly in the
 conversation, and wait for human direction. Do not improvise.
+
+---
+
+## 7. Communication convention
+
+Khi hoàn thành một implementation task, agent output bằng tiếng Việt.
+
+Code / identifier / file name: dùng English convention hiện có của
+repository.
+
+Completion summary nên có:
+
+1. Files created / modified
+2. Implementation summary
+3. Dataset / result summary
+4. Tests
+5. Lint
+6. Format
+7. Input / output SHA nếu applicable
+8. Assumptions
+9. PENDING_REVIEW decisions
+10. Remaining issues
+11. Scope explicitly NOT performed nếu quan trọng
+
+---
+
+## 8. Token efficiency
+
+Các prompt của phase sau có thể ngắn gọn vì rules đã có trong file này:
+
+> "Đọc AGENTS.md và plan hiện tại. Implement đúng plan. Nếu methodology
+> ambiguity → dừng và báo cáo. Không mở rộng scope."
+
+Không cần lặp lại trong mỗi prompt các constraint đã có ở §2 (no commit,
+no push, no PR, no invent, no silent methodology change, phase isolation,
+input integrity, human approval gate, output reporting requirements).
+
+Phase-specific prompt chỉ cần override / clarify nếu có ngoại lệ.
+
+---
+
+## 9. Relationship to AGENTS.md vs phase plan
+
+| Concern                          | Source of truth                                  |
+| -------------------------------- | ------------------------------------------------ |
+| Global, cross-phase rules        | `AGENTS.md` (this file)                           |
+| Phase-specific methodology       | Approved plan of that phase                      |
+| Phase-specific decisions / data  | ADR + report + config của phase đó               |
+| Reproducibility metadata        | `reports/<stage>/<stage>_run.json`               |
+| Data dictionary / column meaning | `docs/data_dictionary/`                          |
+
+**Không** đưa phase-specific decisions hoặc con số/data statistics
+của một phase cụ thể vào file này. Phase-specific thuộc về plan/config/
+report của phase đó.
+
+`AGENTS.md` chỉ chứa principle / rule dùng chung, không trở thành
+prompt dài cho một phase bất kỳ.

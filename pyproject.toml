@@ -85,7 +85,7 @@ filterwarnings = [
 line-length = 100
 target-version = "py311"
 src = ["src", "tests", "scripts"]
-extend-exclude = [".venv", "build", "dist", ".pytest_cache"]
+extend-exclude = [".venv", "build", "dist", ".pytest_cache", "configs"]
 
 [tool.ruff.lint]
 # Sensible default rule selection; teams can tighten later.
@@ -106,8 +106,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["N802", "N803"]  # tests may use sklearn/X API casing
-"src/customer_segmentation/clustering/*" = ["N803"]  # X is the conventional ML feature-matrix name
+"tests/*" = ["N802", "N803", "N806"]  # tests may use sklearn/X API casing
+"src/customer_segmentation/clustering/*" = ["N803", "N806"]  # X is the conventional ML feature-matrix name (used by ML-01 runner)
 "src/customer_segmentation/evaluation/*" = ["N803"]  # X is the conventional ML feature-matrix name
 "src/customer_segmentation/transformation/*" = ["N803"]  # X is the conventional ML feature-matrix name
 "src/customer_segmentation/visualization/*" = ["N803"]  # X is the conventional ML feature-matrix name
