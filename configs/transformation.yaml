@@ -1,0 +1,276 @@
+# ---------------------------------------------------------------------------
+# FE-06 Transformation configuration — FE-06-v1.0
+# ---------------------------------------------------------------------------
+#
+# FE-06 Plan V2 (revised) — corrections applied:
+#   A1. C7 is the FULL 14-feature working configuration:
+#       - Transformation: yeo_johnson cho TOAN BO 14 eligible features
+#         (khong co ngoai le per-feature).
+#       - Scaling: robust cho TOAN BO 14 eligible features.
+#       - Imputation: median cho PurchaseIntervalMean va PurchaseIntervalStd.
+#       - Status: WORKING_ASSUMPTION / MENTOR_REVIEW_PENDING.
+#       - Working configuration KHONG duoc goi la best/recommended/optimal.
+#       - Rate features (CancellationRate, ReturnRate) cung duoc Yeo-Johnson
+#         trong C7 (KHONG giu T0).
+#       - Mixed configuration (rate features giu T0) neu co se la configuration
+#         rieng, KHONG phai C7.
+#   A2. Experimental configuration matrix uu tien ro rang:
+#         C0 = none + none
+#         C1 = none + standard
+#         C2 = none + minmax
+#         C3 = none + robust
+#         C6 = yeo_johnson + standard
+#         C7 = yeo_johnson + robust (WORKING)
+#       C4/C5 KHONG co mat trong matrix (da loai bo).
+#       Log1p-based configurations (vi du T1+Sx) khong full-matrix comparable
+#       vi nhieu feature co am; neu duoc them vao sau, phai danh dau
+#       NOT_FULL_MATRIX va khong ranking.
+#       KHONG score/rank configurations.
+#   A3. Human review vs working default:
+#       - Mentor chua approve -> methodology van PENDING_REVIEW.
+#       - Implementation van duoc phep chay bang working defaults da khai bao.
+#       - Agent KHONG duoc tu thay doi working defaults.
+#       - Dataset tao ra la TECHNICALLY_GENERATED.
+#       - TECHNICALLY_GENERATED != RESEARCH_APPROVED_FINAL.
+#   A4. ReferenceDate = max(InvoiceDate) + 1 day (FE-05 owned).
+#       FE-06 KHONG recompute ReferenceDate.
+#       FE-06 chi su dung Recency da duoc FE-05 tinh san.
+#       FE-06 doc gia tri Recency tu customer_candidates.parquet.
+#       FE-06 KHONG su dung wording "snapshot_max" (do FE-05 quan ly).
+#   A5. Determinism cua pickle:
+#       - final_clustering_dataset.parquet phai reproducible.
+#       - customer_metadata.parquet phai reproducible.
+#       - fitted pipeline phai load duoc.
+#       - fitted pipeline phai giu dung feature/schema.
+#       - transform cung input phai cho numerical output tuong duong.
+#       - Ghi library versions de trace compatibility.
+#       - Pickle SHA ghi trong metadata neu file ton tai, NHUNG:
+#         KHONG dung byte-level SHA equality cross-environment lam hard
+#         acceptance criterion.
+#   A6. CustomerID alignment:
+#       - metadata row count == final matrix row count.
+#       - CustomerID unique.
+#       - metadata row order giu nguyen source candidate order.
+#       - mapping CustomerID <-> final row duoc kiem tra.
+#       - KHONG sort metadata doc lap voi final matrix.
+#       - alignment: "verified_by_position_and_unique_key".
+#   A7. Rate features trong C7:
+#       - CancellationRate -> Yeo-Johnson trong C7 (KHONG giu T0).
+#       - ReturnRate -> Yeo-Johnson trong C7 (KHONG giu T0).
+#       - Neu muon giu rate T0 thi do phai la mixed configuration rieng.
+#   A8. Working matrix mac dinh: 14 features (Recency, Frequency, Monetary,
+#       TotalQuantity, AverageQuantity, BasketSize, TenureDays,
+#       PurchaseIntervalMean, PurchaseIntervalStd, ActiveDays,
+#       AverageInvoiceValue, ProductsPerInvoice, CancellationRate, ReturnRate).
+#       KHONG auto-drop redundancy.
+#   A9. Self-check:
+#       - C7 that su la full 14-feature configuration.
+#       - KHONG goi C7 la best/recommended/optimal.
+#       - KHONG clustering, KHONG evaluation, KHONG tuning.
+#       - KHONG sua FE-05 output / customer_candidates.parquet.
+#
+# Status markers:
+#   WORKING_ASSUMPTION    - working default; chua duoc mentor approve methodology.
+#   MENTOR_REVIEW_PENDING - cho mentor review truoc khi promote final.
+#
+# Hard constraints (AGENTS.md):
+#   - Input: data/processed/customer_candidates.parquet (READ-ONLY).
+#   - Output: data/processed/final_clustering_dataset.parquet (no CustomerID).
+#   - CustomerID tach rieng vao customer_metadata.parquet.
+#   - KHONG: clustering, KHONG: evaluation, KHONG: tuning.
+#   - KHONG: best/recommended/optimal claim.
+#   - KHONG: auto-drop redundancy.
+#   - Pipeline deterministic (random_seed = null).
+#
+# Working configuration (C7):
+#   - imputation: median for PurchaseIntervalMean, PurchaseIntervalStd
+#   - transformation: yeo_johnson for ALL 14 eligible features
+#   - scaling: robust for ALL 14 eligible features
+#   - Status: WORKING_ASSUMPTION / MENTOR_REVIEW_PENDING
+# ---------------------------------------------------------------------------
+
+transformation:
+  enabled: true
+  random_seed: null
+  random_seed_reason: "deterministic_pipeline"
+
+  # ---------------------------------------------------------------
+  # Source / output
+  # ---------------------------------------------------------------
+  source:
+    customer_candidates_path: "./data/processed/customer_candidates.parquet"
+    customer_key: "CustomerID"
+
+  output:
+    processed_dir: "./data/processed"
+    final_clustering_filename: "final_clustering_dataset.parquet"
+    customer_metadata_filename: "customer_metadata.parquet"
+    fitted_pipeline_filename: "fitted_preprocessing_pipeline.pkl"
+    report_dir: "./reports/fe06"
+
+  # ---------------------------------------------------------------
+  # Feature eligibility
+  # ---------------------------------------------------------------
+  feature_eligibility:
+    include_layers:
+      - CANDIDATE
+    exclude_identifiers: true           # CustomerID NEVER in matrix
+    exclude_unsupported: true           # CategoryCount NEVER in matrix
+    exclude_base_reference: true        # BASE_REFERENCE NEVER in matrix
+    max_missing_ratio: 0.5
+    redundancy_threshold: 0.95
+    auto_drop_redundant: false         # Diagnostic only; never auto-drop
+
+  # ---------------------------------------------------------------
+  # Missing-value handling (imputation)
+  # ---------------------------------------------------------------
+  imputation:
+    candidates:
+      - median
+    working:
+      method: median
+      status: WORKING_ASSUMPTION
+      review: MENTOR_REVIEW_PENDING
+      applied_features:
+        - PurchaseIntervalMean
+        - PurchaseIntervalStd
+      rationale: >
+        Median ổn định với outlier; không bias như mean;
+        không gây hiểu nhầm "zero = no interval" như fill 0.
+        WORKING_ASSUMPTION — chưa được mentor approve.
+
+  # ---------------------------------------------------------------
+  # Transformation candidates
+  # ---------------------------------------------------------------
+  transformation_policy:
+    candidates:
+      - none           # T0
+      - log1p          # T1 (only for non-negative features)
+      - yeo_johnson    # T2 (any feature; sklearn PowerTransformer)
+
+    per_feature_applicability:
+      # Feature có âm → KHONG duoc phep T1 (log1p)
+      Recency:                [none, log1p, yeo_johnson]
+      Frequency:              [none, log1p, yeo_johnson]
+      Monetary:               [none, yeo_johnson]      # co am → khong log1p
+      TotalQuantity:          [none, yeo_johnson]      # co am → khong log1p
+      AverageQuantity:        [none, yeo_johnson]      # co am → khong log1p
+      BasketSize:             [none, yeo_johnson]      # co am → khong log1p
+      TenureDays:             [none, log1p, yeo_johnson]
+      PurchaseIntervalMean:   [none, log1p, yeo_johnson]
+      PurchaseIntervalStd:    [none, log1p, yeo_johnson]
+      ActiveDays:            [none, log1p, yeo_johnson]
+      AverageInvoiceValue:    [none, yeo_johnson]      # co am → khong log1p
+      ProductsPerInvoice:     [none, log1p, yeo_johnson]
+      CancellationRate:       [none, yeo_johnson]      # rate [0,1]; yeo_johnson diagnostic
+      ReturnRate:             [none, yeo_johnson]      # rate [0,1]; yeo_johnson diagnostic
+
+    working:
+      method: yeo_johnson
+      status: WORKING_ASSUMPTION
+      review: MENTOR_REVIEW_PENDING
+      rationale: >
+        Yeo-Johnson xu ly duoc ca feature co am va khong am.
+        Don gian hoa pipeline: 1 transformation cho TOAN BO 14 features.
+        WORKING_ASSUMPTION — chua duoc mentor approve.
+
+  # ---------------------------------------------------------------
+  # Scaling candidates
+  # ---------------------------------------------------------------
+  scaling_policy:
+    candidates:
+      - none        # S0
+      - standard    # S1
+      - minmax      # S2
+      - robust      # S3
+
+    working:
+      method: robust
+      status: WORKING_ASSUMPTION
+      review: MENTOR_REVIEW_PENDING
+      rationale: >
+        RobustScaler tolerant outlier; phu hop voi distribution heavy-tail.
+        WORKING_ASSUMPTION — chua duoc mentor approve.
+
+  # ---------------------------------------------------------------
+  # Candidate transformation x scaling experimental configurations
+  # ---------------------------------------------------------------
+  # Full-matrix configurations (14 features):
+  # C0: none + none
+  # C1: none + standard
+  # C2: none + minmax
+  # C3: none + robust
+  # C6: yeo_johnson + standard
+  # C7: yeo_johnson + robust (WORKING)
+  #
+  # Note: T1 (log1p) NOT applied to features with negative values.
+  # log1p diagnostics only for non-negative subset — NOT full-matrix comparable.
+  # These are NOT ranked or scored; only C7 is materialized.
+  experimental_configurations:
+    - id: "C0"
+      transformation: "none"
+      scaling: "none"
+      is_full_matrix: true
+    - id: "C1"
+      transformation: "none"
+      scaling: "standard"
+      is_full_matrix: true
+    - id: "C2"
+      transformation: "none"
+      scaling: "minmax"
+      is_full_matrix: true
+    - id: "C3"
+      transformation: "none"
+      scaling: "robust"
+      is_full_matrix: true
+    - id: "C6"
+      transformation: "yeo_johnson"
+      scaling: "standard"
+      is_full_matrix: true
+    - id: "C7"
+      transformation: "yeo_johnson"
+      scaling: "robust"
+      is_full_matrix: true
+
+  working_configuration:
+    id: "C7"
+    transformation: "yeo_johnson"
+    scaling: "robust"
+    imputation: "median"
+    status: WORKING_ASSUMPTION
+    review: MENTOR_REVIEW_PENDING
+    features_affected: "all_14_eligible_features"
+    notes:
+      - "C7 la working configuration — khong phai final approved."
+      - "Yeo-Johnson ap dung cho TOAN BO 14 features (khong co ngoai le)."
+      - "Rate features (CancellationRate, ReturnRate) cung duoc Yeo-Johnson trong C7."
+      - "Mentor review PENDING."
+
+  # ---------------------------------------------------------------
+  # Metadata
+  # ---------------------------------------------------------------
+  metadata:
+    stage: "FE-06"
+    dataset_version: "FE06-v1.0"
+    dataset_version_meaning: "initial technically generated working dataset"
+    task_description: >
+      Transform + scale + impute candidate features into Final Clustering Dataset.
+      No clustering, no evaluation, no best-method claim.
+    scope_boundaries:
+      - "Feature eligibility gate (CANDIDATE only)"
+      - "CustomerID tách riêng vào customer_metadata.parquet"
+      - "NaN imputation: median (PurchaseIntervalMean, PurchaseIntervalStd)"
+      - "Transformation: T0(none)/T1(log1p)/T2(yeo_johnson)"
+      - "Scaling: S0(none)/S1(standard)/S2(minmax)/S3(robust)"
+      - "Working configuration C7: yeo_johnson + robust"
+      - "Materialize 1 final dataset"
+      - "Save 1 fitted pipeline"
+      - "Reproducibility metadata + SHA-256"
+      - "KHONG: clustering, evaluation, tuning, best-method selection"
+    notes:
+      - "Tat ca working decisions la WORKING_ASSUMPTION."
+      - "Final approval can mang mentor review + ADR."
+      - "Redundancy gate la diagnostic only — khong auto-drop."
+      - "ReferenceDate = max(InvoiceDate)+1day (FE-05, khong recompute trong FE-06)."
+      - "Pipeline deterministic; random_seed = null."
+      - "Pickle SHA ghi nhung khong dung byte-level equality lam hard criterion."

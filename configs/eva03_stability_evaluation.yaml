@@ -1,0 +1,258 @@
+# ---------------------------------------------------------------------------
+# EVA-03 — Stability & Reproducibility Evaluation Configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the EVA-03 evaluation phase. EVA-03
+# ANALYSES the raw stability and reproducibility evidence produced by
+# EXP-05 (Block R / Block S / Block N) and the metadata evidence from
+# EXP-01 (default) / EXP-03 (working-selected).
+#
+# EVA-03 scope:
+#   - Compute ARI / AMI / NMI for each (block, algorithm) grouping.
+#   - Cluster label Hungarian alignment for descriptive cluster
+#     correspondence across runs (NOT for evaluation metrics).
+#   - Reproducibility report (Block R, label-level).
+#   - Seed stability report (Block S, label-level ARI/AMI/NMI).
+#   - Perturbation robustness report (Block N, sigma = 0 / 0.01 / 0.05).
+#   - EXP-01 default vs EXP-03 working-selected descriptive
+#     comparison (metric-based; no label-level comparison
+#     unless labels are available).
+#
+# EVA-03 does NOT:
+#   - Run clustering.
+#   - Declare an algorithm "most stable" / "best stability".
+#   - Declare a configuration "FINAL" / "APPROVED" / "OPTIMAL".
+#   - Produce composite stability scores.
+#   - Invent metrics.
+#
+# EVA-03 inputs (read-only):
+#   - reports/exp05/exp05_cluster_labels.parquet (REQUIRED, 75 runs).
+#   - reports/exp05/exp05_*_aggregate.csv (per-block aggregates).
+#   - reports/exp01/cluster_labels_EXP-01-{algorithm}_rep4.parquet
+#     (EXP-01 default reference labels for each algorithm, last
+#     repetition).
+#   - reports/exp03/exp03_selected_configurations.csv
+#     (EXP-03 working-selected metadata — NO labels).
+#   - reports/exp03/exp03_hyperparameter_results.csv
+#     (full EXP-03 sweep — for matching EXP-03 baseline / Stage A).
+#
+# EVA-03 outputs:
+#   - reports/evaluation/eva03/tables/*.csv
+#   - reports/evaluation/eva03/figures/*.png
+#   - reports/evaluation/eva03/eva03_stability_report.md
+#   - reports/evaluation/eva03/eva03_reproducibility_report.md
+#   - reports/evaluation/eva03/eva03_comparison_report.md
+#   - reports/evaluation/eva03/eva03_run_manifest.json
+# ---------------------------------------------------------------------------
+
+eva03:
+  name: "EVA-03 Stability & Reproducibility Evaluation"
+  description: >
+    EPIC-08 / RQ3 evidence analysis. Compute ARI / AMI / NMI / Hungarian
+    label alignment across reproducibility (Block R), seed stability
+    (Block S), perturbation robustness (Block N), and EXP-01 default
+    vs EXP-03 working-selected metadata. No algorithm is declared
+    'most stable' or 'best'.
+
+  # -----------------------------------------------------------------------
+  # Inputs (read-only)
+  # -----------------------------------------------------------------------
+  inputs:
+    exp05_labels_artifact: "reports/exp05/exp05_cluster_labels.parquet"
+    exp05_reproducibility_aggregate: "reports/exp05/exp05_reproducibility_aggregate.csv"
+    exp05_seed_sweep_aggregate: "reports/exp05/exp05_seed_sweep_aggregate.csv"
+    exp05_noise_perturbation_aggregate: "reports/exp05/exp05_noise_perturbation_aggregate.csv"
+    exp01_labels_dir: "reports/exp01"   # cluster_labels_EXP-01-{algo}_rep4.parquet
+    exp03_selected_configurations: "reports/exp03/exp03_selected_configurations.csv"
+    exp03_hyperparameter_results: "reports/exp03/exp03_hyperparameter_results.csv"
+    customer_metadata: "data/processed/customer_metadata.parquet"
+
+  # -----------------------------------------------------------------------
+  # Algorithm participation (mirror EXP-05)
+  # -----------------------------------------------------------------------
+  algorithms:
+    - kmeans
+    - agglomerative
+    - dbscan
+    - gmm
+    - fuzzy_cmeans
+
+  # -----------------------------------------------------------------------
+  # Block R — Reproducibility evaluation
+  # -----------------------------------------------------------------------
+  block_r:
+    description: >
+      Reproducibility verification (NOT stability analysis).
+      For each algorithm × 5 repeats, compute pairwise ARI / AMI / NMI
+      across the 5 Block R repeats. Expectation: all pairs (i, j)
+      should yield ARI = AMI = NMI = 1.0 (perfectly identical labels).
+    seed: 42
+    n_repeat: 5
+    decision_status_verified: "REPRODUCIBILITY_VERIFIED_LABEL_LEVEL"
+    decision_status_failed: "REPRODUCIBILITY_FAILED_LABEL_LEVEL"
+
+  # -----------------------------------------------------------------------
+  # Block S — Random seed stability evaluation
+  # -----------------------------------------------------------------------
+  block_s:
+    description: >
+      Seed stability analysis (K-Means + GMM + FCM only). For each
+      algorithm, the BLOCK S seed is the reference; compute pairwise
+      ARI / AMI / NMI across the 5 seeds. Aggreglomerative + DBSCAN
+      deterministic and excluded (Block S does not contain them).
+    seeds: [42, 7, 123, 2024, 1729]
+    algorithms: [kmeans, gmm, fuzzy_cmeans]
+    excluded: [agglomerative, dbscan]
+    exclusion_reason: >
+      Agglomerative (Ward linkage, deterministic) and DBSCAN produce
+      identical labels across seeds in the EXP-05 evidence; they are
+      not included in Block S.
+
+  # -----------------------------------------------------------------------
+  # Block N — Feature perturbation robustness evaluation
+  # -----------------------------------------------------------------------
+  block_n:
+    description: >
+      In-memory Gaussian perturbation robustness. For each algorithm
+      and each non-zero sigma, compute pairwise ARI / AMI / NMI against
+      the sigma=0 baseline (sanity) AND across the 3 perturbation seeds.
+      sigma=0 sanity should reproduce the algorithm's deterministic
+      pattern.
+    sigma_grid: [0.0, 0.01, 0.05]
+    perturbation_seeds: [42, 43, 44]
+    baseline_column: "sigma"
+
+  # -----------------------------------------------------------------------
+  # Hyperparameter comparison (EXP-01 default vs EXP-03 working-selected)
+  # -----------------------------------------------------------------------
+  hyperparameter_comparison:
+    description: >
+      Metric-based descriptive comparison ONLY. EXP-03 working-selected
+      labels are NOT in the EXP-05 artifact, so no label-level ARI/AMI
+      is computed. This evaluation surfaces (a) the metric values of
+      EXP-01 default vs EXP-03 working-selected for each algorithm and
+      (b) the documented decision_status.
+    default_source: "EXP-01 baseline (K=4, EXP-01 working defaults)"
+    working_selected_source: "EXP-03 working-selected (per algorithm)"
+    evidence_note: >
+      EXP-01 vs EXP-03 comparison is metric-based and descriptive. No
+      label-level ARI/AMI can be computed because EXP-03 working-selected
+      cluster_labels are not persisted in any artifact currently in the
+      repository. This is documented as a methodology limitation; if
+      label-level evidence becomes available, a follow-up artefact
+      can be computed.
+
+  # -----------------------------------------------------------------------
+  # Label comparison parameters
+  # -----------------------------------------------------------------------
+  label_compare:
+    ari:
+      description: >
+        Adjusted Rand Index (sklearn default).
+        Permutation-invariant by construction.
+    ami:
+      description: >
+        Adjusted Mutual Information (sklearn default, average_method='arithmetic').
+        Permutation-invariant by construction.
+    nmi:
+      description: >
+        Normalized Mutual Information (sklearn default, average_method='arithmetic').
+        Permutation-invariant by construction.
+        Reported alongside AMI for completeness; not used in primary
+        stability claim.
+    hungarian:
+      description: >
+        Hungarian matching on the contingency matrix. Maps cluster
+        label IDs in one run to the most similar cluster IDs in
+        another run. DESCRIPTIVE ONLY — provides per-cluster
+        correspondence, NOT a stability metric.
+      exclude_noise_label: -1   # DBSCAN noise not part of matching
+      match_score: "overlap_count"   # Use point-count overlap on contingency matrix
+
+  # -----------------------------------------------------------------------
+  # Cluster size variation
+  # -----------------------------------------------------------------------
+  cluster_size_variation:
+    description: >
+      For each (block, algorithm) group, record the per-cluster
+      customer_count distribution across runs. Compute the
+      per-cluster Min / Max / Range as evidence of cluster size
+      variation. NO ordering / ranking / weighting.
+
+  # -----------------------------------------------------------------------
+  # Decision status taxonomy
+  # -----------------------------------------------------------------------
+  decision_status:
+    permitted:
+      - "REPRODUCIBILITY_VERIFIED_LABEL_LEVEL"
+      - "REPRODUCIBILITY_FAILED_LABEL_LEVEL"
+      - "SEED_STABILITY_EVIDENCE_ANALYZED"
+      - "PERTURBATION_ROBUSTNESS_EVIDENCE_ANALYZED"
+      - "SIGMA_ZERO_BASELINE_MATCH_LABEL_LEVEL"
+      - "SIGMA_ZERO_BASELINE_MISMATCH_LABEL_LEVEL"
+      - "HYPERPARAMETER_COMPARISON_METADATA"
+      - "HUNGARIAN_DESCRIPTIVE_EVIDENCE"
+      - "PENDING_REVIEW"
+    forbidden:
+      - "BEST"
+      - "OPTIMAL"
+      - "WINNER"
+      - "SUPERIOR"
+      - "RECOMMENDED"
+      - "FINAL"
+      - "APPROVED"
+
+  # -----------------------------------------------------------------------
+  # Output
+  # -----------------------------------------------------------------------
+  output:
+    dir: "reports/evaluation/eva03"
+    tables_subdir: "tables"
+    figures_subdir: "figures"
+    reports:
+      stability: "eva03_stability_report.md"
+      reproducibility: "eva03_reproducibility_report.md"
+      comparison: "eva03_comparison_report.md"
+    manifest: "eva03_run_manifest.json"
+
+  # -----------------------------------------------------------------------
+  # Pending review decisions
+  # -----------------------------------------------------------------------
+  pending_review_notes:
+    - id: "EV03-ARI-01"
+      decision: "ARI / AMI / NMI = sklearn defaults (adjusted_rand_score, adjusted_mutual_info_score, normalized_mutual_info_score); no method override"
+      status: "WORKING_ASSUMPTION"
+    - id: "EV03-HG-01"
+      decision: "Hungarian matching = point-count overlap on contingency matrix; descriptive only (not a stability metric)"
+      status: "WORKING_ASSUMPTION"
+    - id: "EV03-GRP-01"
+      decision: "Block S grouping for ARI = (algorithm); Agglomerative + DBSCAN excluded"
+      status: "WORKING_ASSUMPTION"
+    - id: "EV03-GRP-02"
+      decision: "Block N baseline = sigma=0 row of the same algorithm (not EXP-01)"
+      status: "WORKING_ASSUMPTION"
+    - id: "EV03-HP-01"
+      decision: "EXP-01 vs EXP-03 = metric-based descriptive only; no label-level comparison (labels for EXP-03 not in artifact)"
+      status: "TECHNICALLY_LIMITED"
+    - id: "EV03-DBSCAN-01"
+      decision: "DBSCAN noise label (-1) excluded from Hungarian matching; included in ARI/AMI/NMI (those are permutation-invariant by definition)"
+      status: "WORKING_ASSUMPTION"
+    - id: "EV03-NO-RANKING"
+      decision: "No cross-algorithm ranking, no overall-stability ranking. Each algorithm presented independently."
+      status: "TECHNICALLY_IMPLEMENTED"
+    - id: "EV03-NO-COMPOSITE"
+      decision: "No composite stability score. ARI / AMI / NMI reported as separate columns; no weighted combination."
+      status: "TECHNICALLY_IMPLEMENTED"
+
+  scope_boundaries:
+    - "EVA-03 ANALYSES EXP-05 raw evidence; it does NOT run clustering."
+    - "Input: reports/exp05/* (READ-ONLY). NO mutation of EXP-05 artifacts."
+    - "Output: descriptive / evidence-only. No 'most stable' / 'best' claims."
+    - "Reproducibility (Block R), seed stability (Block S), perturbation robustness (Block N), hyperparameter metadata (EXP-01 vs EXP-03) reported as FOUR separate analyses."
+    - "ARI / AMI / NMI are permutation-invariant (sklearn default); label matching uses Hungarian (descriptive)."
+    - "Cluster size variation recorded as per-cluster (min, max, range) per (algorithm, block)."
+    - "Cross-algorithm ranking FORBIDDEN."
+    - "Composite / weighted stability score FORBIDDEN."
+    - "Promotion of WORKING_SELECTED to RESEARCH_APPROVED FORBIDDEN."
+    - "DBSCAN noise (-1) is included in ARI/AMI/NMI (permutation-invariant) but excluded from Hungarian matching."
+    - "Hungarian alignment is DESCRIPTIVE only — NOT a stability metric. Documented in output."
