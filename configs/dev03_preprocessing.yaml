@@ -1,0 +1,167 @@
+# ---------------------------------------------------------------------------
+# DEV-03 Prototype Preprocessing configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-03 prototype preprocessing pipeline.
+# This file is loaded by `customer_segmentation.prototype.preprocessing.config_loader`.
+#
+# Layout
+# ------
+#   dev03_preprocessing:
+#     preprocessing:
+#       cleaning:                 # Stage C (FE-02 mirror)
+#       transformation:           # Stage D (sklearn direct)
+#       outlier:                  # Stage C4 (off by default)
+#       logging:                  # Per-stage emission
+#       storage:                  # Output format / emit_intermediate
+#       research_safety:          # Defence-in-depth read-only paths
+#     feature_generation:
+#       aggregation:              # Stage F1 (FE-04 mirror)
+#       features:                 # Stage F2 (FE-05 mirror)
+#       optional_transform:       # Stage F3 (post-aggregation transform/scale)
+#       reference_date:           # Stage F2 RFM.Recency base date
+#
+# Status: TECHNICALLY_IMPLEMENTED, NOT RESEARCH_APPROVED.
+# This file is part of the prototype layer and does not affect the
+# research methodology. Status annotations for cleaning rules
+# (CL-01..CL-10) are inherited verbatim from FE-02 (the source of
+# truth is configs/preprocessing.yaml::KEY_ANNOTATIONS). DEV-03 does
+# NOT reclassify or promote any status.
+#
+# Hard constraints (AGENTS.md):
+# - The optional transformation/scaling stage surfaces every (3 × 4)
+#   combo from EXP-04; each combo is `WORKING_ASSUMPTION` (NOT
+#   promoted). The default is `none × none` (identity).
+# - Outlier policy is off by default (matches FE-02 default);
+#   `PENDING_MENTOR_REVIEW` per AGENTS.md §2.9.
+# - Cancellation / return flagging stays on by default (matches
+#   FE-02 defaults; CL-06 / CL-08 = PENDING_MENTOR_REVIEW).
+# ---------------------------------------------------------------------------
+
+dev03_preprocessing:
+  preprocessing:
+    enabled: true
+
+    # ---------------------------------------------------------------
+    # Cleaning (Stage C — wraps FE-02 InvalidRecordRules + PipelineConfig)
+    # ---------------------------------------------------------------
+    cleaning:
+      duplicate_subset: null
+      duplicate_keep: "first"
+      missing_strategy: "keep"
+      missing_columns: []
+      invalid_records:
+        # Drop rules (WORKING_ASSUMPTION)
+        drop_missing_invoice_no: true             # CL-10   WORKING_ASSUMPTION
+        drop_missing_customer_id: true           # CL-01   WORKING_ASSUMPTION
+        drop_missing_description: true           # CL-03   WORKING_ASSUMPTION
+        drop_unparseable_invoice_date: true      # CL-04   WORKING_ASSUMPTION
+        drop_zero_quantity: true                 # CL-05   WORKING_ASSUMPTION
+        drop_non_positive_unit_price: true       # CL-07   WORKING_ASSUMPTION
+        # Flag rules (PENDING_MENTOR_REVIEW; status inherited from FE-02)
+        flag_cancellations: true                 # CL-08   PENDING_MENTOR_REVIEW
+        flag_returns: true                       # CL-06   PENDING_MENTOR_REVIEW
+        cancellation_prefix: "C"
+
+    # ---------------------------------------------------------------
+    # Transformation (Stage D — sklearn direct, NOT via C7-bound wrappers)
+    # ---------------------------------------------------------------
+    # Allowed values: "none" | "log1p" | "yeo_johnson". Default = identity.
+    transformation:
+      transformation: "none"
+      # numeric_columns: empty = auto-detect numeric columns (CustomerID excluded)
+      numeric_columns: []
+
+    # ---------------------------------------------------------------
+    # Outlier (Stage C4 — off by default per FE-02 + PLAN)
+    # ---------------------------------------------------------------
+    outlier:
+      action: "none"
+      method: "iqr"
+      columns: []
+      iqr_multiplier: 1.5
+      zscore_threshold: 3.0
+
+    # ---------------------------------------------------------------
+    # Logging
+    # ---------------------------------------------------------------
+    logging:
+      level: "INFO"
+      format: "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+      log_dir_relative: "data/prototype/datasets"
+      emit_to_console: true
+
+    # ---------------------------------------------------------------
+    # Storage
+    # ---------------------------------------------------------------
+    # DEV-03 writes to <storage_root>/<dataset_id>/preprocessed/.
+    # ``emit_intermediate=true`` writes the cleaned transaction-level
+    # parquet alongside the ML Dataset. ``emit_intermediate=false`` only
+    # writes the ML Dataset (default = true for traceability).
+    storage:
+      output_format: "parquet"
+      emit_intermediate: true
+      csv_max_rows: 0
+
+    # ---------------------------------------------------------------
+    # Research safety (defence-in-depth)
+    # ---------------------------------------------------------------
+    research_safety:
+      readonly_paths:
+        - "data/raw/primary"
+        - "data/raw/backup"
+        - "data/processed"
+        - "reports"
+
+  # -------------------------------------------------------------------------
+  # Feature generation (Stage F — FE-04 + FE-05 wrap)
+  # -------------------------------------------------------------------------
+  feature_generation:
+    # Stage F1: aggregation (FE-04 mirror).
+    aggregation:
+      customer_key: "CustomerID"
+      line_revenue_quantity_column: "Quantity"
+      line_revenue_unit_price_column: "UnitPrice"
+      line_revenue_output_column: "LineRevenue"
+      source:
+        role: "primary"
+        # Cleaned dataset path is resolved at runtime from the
+        # DEV-03 cleaned intermediate.
+        cleaned_dataset_path: ""
+        raw_dataset_path: ""
+
+    # Stage F2: feature engineering (FE-05 mirror).
+    # ONE Monetary (default = MonetarySigned).
+    # ONE Frequency (default = Frequency_ByInvoice).
+    # ONE Quantity working set (default = signed).
+    # PurchaseIntervalMean/Std: NaN for < 2 invoices (NOT 0).
+    # CategoryCount: NOT materialized (FE-05 hard constraint).
+    features:
+      monetary_strategy: "signed"
+      monetary_status: "WORKING_ASSUMPTION"
+      frequency_mode: "by_invoice"
+      frequency_status: "WORKING_ASSUMPTION"
+      quantity_strategy: "signed"
+      quantity_status: "WORKING_ASSUMPTION"
+      purchase_interval_ddof: 1
+      diversity_enabled: true
+      diversity_strategy: "products_per_invoice"
+      cancellation_enabled: true
+      return_enabled: true
+
+    # Stage F3: optional transform/scale on customer-level matrix.
+    # Each combo is `WORKING_ASSUMPTION` (NOT promoted). C7-like combo
+    # (`yeo_johnson × robust`) is one of the 12 combos in the grid;
+    # it is NOT recommended as final.
+    optional_transform:
+      transformation: "none"   # none | log1p | yeo_johnson
+      scaling: "none"          # none | standard | minmax | robust
+      imputation: "median"     # none | median | mean
+      numeric_columns: []
+
+    # Stage F2 reference-date computation.
+    # `from_data_max` (default): max(InvoiceDate) + 1 day (FE-05 default).
+    # `from_config`: use a fixed ISO date (must set fixed_iso_date below).
+    reference_date:
+      mode: "from_data_max"
+      fixed_iso_date: null

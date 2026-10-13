@@ -77,6 +77,9 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+markers = [
+    "c7_dependent: mark test as C7-config-dependent (skipped by default).",
+]
 
 # ---------------------------------------------------------------------------
 # Ruff configuration
@@ -109,6 +112,20 @@ ignore = [
 "tests/*" = ["N802", "N803", "N806"]  # tests may use sklearn/X API casing
 "src/customer_segmentation/clustering/*" = ["N803", "N806"]  # X is the conventional ML feature-matrix name (used by ML-01 runner)
 "src/customer_segmentation/evaluation/*" = ["N803"]  # X is the conventional ML feature-matrix name
+
+# DEV-03 (prototype layer) — match DEV-02 conventions; allow imports
+# placed mid-function for circular-import avoidance (E402), and allow
+# the str-Enum pattern (UP042) the existing research core uses.
+"src/customer_segmentation/prototype/*" = [
+    "E402",  # mid-function imports for circular-import avoidance
+    "F401",  # unused-public-import re-exports in __init__.py
+    "F841",  # placeholder throws (Exception paths) need refs
+    "N814",  # `_VR` is a privacy convention from DEV-02 research core
+    "N818",  # exception name suffix is fine
+    "N806",  # constant-in-function is rare but acceptable
+    "UP042", # str-Enum mirror of FE-02 / FE-04 / DEV-02 conventions
+    "SIM300", # Yoda condition is acceptable in tests
+]
 "src/customer_segmentation/transformation/*" = ["N803"]  # X is the conventional ML feature-matrix name
 "src/customer_segmentation/visualization/*" = ["N803"]  # X is the conventional ML feature-matrix name
 "notebooks/*" = ["E402", "F401"]

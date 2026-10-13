@@ -1,0 +1,195 @@
+# ---------------------------------------------------------------------------
+# DEV-06 Prototype Segmentation Module configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-06 prototype segmentation pipeline.
+# Loaded by `customer_segmentation.prototype.segmentation.config_loader`.
+#
+# Layout
+# ------
+#   dev06_segmentation:
+#     noise_policy:                  # "exclude" (default per ADR-0006) | "include"
+#       default: "exclude"
+#     statistics:                     # Descriptive statistics (NO research metrics)
+#       numerical: [mean, median, std, q1, q3, min, max]
+#       categorical_topk: 10          # per OQ-SEG-DISPLAY-01
+#       categorical_uniqueness_threshold: 50
+#     characteristic_rules:           # per OQ-SEG-CHAR-01 (4-rule reduced set)
+#       enabled:
+#         - "mean_high_<feature>"
+#         - "mean_low_<feature>"
+#         - "median_above_dataset_median_<feature>"
+#         - "top_category_<feature>_<value>"
+#       z_threshold: 1.0
+#     display:
+#       percentage_decimals: 2
+#       missing_value_placeholder: "--"
+#       csv_missing_value: ""
+#       disclaimer_text: "no ranking, recommendation, or winner annotation is emitted"
+#     storage:
+#       output_dir_relative: "segmentation"   # per OQ-SEG-LAYOUT-01
+#       emit_profiles_csv: true
+#       emit_profiles_json: true
+#       emit_characteristics_json: true
+#       emit_sizes_long_csv: true
+#     logging:
+#       level: "INFO"
+#       format: ...
+#       log_dir_relative: "data/prototype/datasets"
+#       emit_to_console: true
+#     research_safety:
+#       readonly_paths: [...]
+#       never_promote_to_research: true
+#       segmentation_scope: "PROFILED_PROTOTYPE"
+#     validation:
+#       min_samples: 2
+#       min_features: 1
+#       require_no_nan: false
+#       exclude_customer_id_from_features: true
+#     compare:
+#       emit_singleton_group: true
+#       show_provenance_per_row: true
+#       disclaimer_text: "no ranking, recommendation, or winner annotation is emitted"
+#
+# Status: TECHNICALLY_IMPLEMENTED (DEV-06 Phase 2), NOT RESEARCH_APPROVED.
+# DEV-06 output is prototype-only. The research_safety block is always:
+#   automatically_promoted_to_research: false
+#   appeared_in_research_evidence: false
+#   scope: "PROFILED_PROTOTYPE"
+#
+# Per ADR-0006 (Accepted 2026-10-09), the noise_policy default is
+# "exclude" for the prototype layer.
+# ---------------------------------------------------------------------------
+
+dev06_segmentation:
+  # ---------------------------------------------------------------
+  # DBSCAN noise handling (per ADR-0006 prototype-scope decision).
+  # Default "exclude" applies uniform DBSCAN-noise exclusion to
+  # feature profile + characteristic compute. CLI --noise-policy
+  # flag provides per-call override; both values are recorded in
+  # segmentation_manifest.json (noise_policy_used field) for full
+  # audit reproducibility.
+  # ---------------------------------------------------------------
+  noise_policy:
+    default: "exclude"
+
+  # ---------------------------------------------------------------
+  # Descriptive statistics (NO research metrics).
+  # `numerical` is a subset of PROFILING_STATISTICS_SET
+  # (mean / median / std / q1 / q3 / min / max). Categorical
+  # statistics (topk_categories, value_counts) are emitted on-demand
+  # (per-feature type detection in profile.py).
+  # `categorical_topk` is per OQ-SEG-DISPLAY-01 (default 10).
+  # `categorical_uniqueness_threshold` controls when an `object` dtype
+  # column is treated as `text_or_id` (skipped from profile).
+  # ---------------------------------------------------------------
+  statistics:
+    numerical:
+      - "mean"
+      - "median"
+      - "std"
+      - "q1"
+      - "q3"
+      - "min"
+      - "max"
+    categorical_topk: 10
+    categorical_uniqueness_threshold: 50
+
+  # ---------------------------------------------------------------
+  # Customer-characteristic rules (per OQ-SEG-CHAR-01, 4-rule reduced set).
+  # The 4 retained rules describe customer characteristics supported
+  # by the feature-profile statistics. The two removed rules
+  # (`category_diversity_low_<feature>`, `missing_share_high_<feature>`)
+  # are profile-quality indicators, not customer characteristics.
+  # `z_threshold` controls the threshold for mean_high_/mean_low_
+  # (segment mean compared to dataset mean; z = 1.0 means 1 std above
+  # dataset mean).
+  # ---------------------------------------------------------------
+  characteristic_rules:
+    enabled:
+      - "mean_high_<feature>"
+      - "mean_low_<feature>"
+      - "median_above_dataset_median_<feature>"
+      - "top_category_<feature>_<value>"
+    z_threshold: 1.0
+
+  # ---------------------------------------------------------------
+  # Display conventions.
+  # CLI/display: "--" (em-dash) for missing values.
+  # CSV: blank cell.
+  # percentage_decimals: rounding precision for percentage columns
+  # in segment_sizes_long.csv (per OQ-SEG-DENOM-01).
+  # disclaimer_text: descriptive-only statement; per AGENTS.md §2.5
+  # no "best/winner/optimal/recommended" terminology.
+  # ---------------------------------------------------------------
+  display:
+    percentage_decimals: 2
+    missing_value_placeholder: "--"
+    csv_missing_value: ""
+    disclaimer_text: "no ranking, recommendation, or winner annotation is emitted; descriptive comparison only; values are post-preprocessing"
+
+  # ---------------------------------------------------------------
+  # Storage
+  # DEV-06 writes under:
+  #   <storage_root>/datasets/<dataset_id>/preprocessed/<preprocessed_id>/clustering/<clustering_id>/segmentation/<segmentation_id>/
+  # The storage root is read from configs/dev02_dataset_management.yaml
+  # (shared with DEV-02/03/04/05). CLI does NOT have --storage-root override.
+  # ---------------------------------------------------------------
+  storage:
+    output_dir_relative: "segmentation"
+    emit_profiles_csv: true
+    emit_profiles_json: true
+    emit_characteristics_json: true
+    emit_sizes_long_csv: true
+
+  # ---------------------------------------------------------------
+  # Per-stage logging (mirrors DEV-04 / DEV-05 layout).
+  # ---------------------------------------------------------------
+  logging:
+    level: "INFO"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+    log_dir_relative: "data/prototype/datasets"
+    emit_to_console: true
+
+  # ---------------------------------------------------------------
+  # Research safety (defence-in-depth; mirror DEV-04 / DEV-05).
+  # Always sets segmentation_scope = "PROFILED_PROTOTYPE" so the
+  # prototype layer never auto-promotes to research evidence.
+  # ---------------------------------------------------------------
+  research_safety:
+    readonly_paths:
+      - "data/raw/primary"
+      - "data/raw/backup"
+      - "data/processed"
+      - "reports"
+    never_promote_to_research: true
+    segmentation_scope: "PROFILED_PROTOTYPE"
+
+  # ---------------------------------------------------------------
+  # Input validation (mirrors ML-01 FrameworkConfig.validation).
+  # DEV-06 re-reads the DEV-04 cluster_labels parquet and the DEV-03
+  # ML Dataset parquet. require_no_nan=false: pandas describe() handles
+  # NaN gracefully; strict no-NaN would force upstream imputation
+  # decisions that are out of DEV-06's scope.
+  # ---------------------------------------------------------------
+  validation:
+    min_samples: 2
+    min_features: 1
+    require_no_nan: false
+    exclude_customer_id_from_features: true
+
+  # ---------------------------------------------------------------
+  # Compare-segmentations display policy (per OQ-SEG-COMPARE-01).
+  # emit_singleton_group=true: a single segmentation is still surfaced
+  #   under a singleton group rather than raising an error.
+  # show_provenance_per_row=true: every comparison row carries
+  #   clustering_id, algorithm, n_samples_used_for_compute, noise_count,
+  #   noise_ratio, noise_policy_used (mandatory per §8.2).
+  # disclaimer_text: exact phrase "no ranking, recommendation, or winner
+  #   annotation is emitted" is the single allowed occurrence of those
+  #   substrings in DEV-06 output (R-DEV-06-08).
+  # ---------------------------------------------------------------
+  compare:
+    emit_singleton_group: true
+    show_provenance_per_row: true
+    disclaimer_text: "no ranking, recommendation, or winner annotation is emitted"

@@ -1,0 +1,113 @@
+# ---------------------------------------------------------------------------
+# DEV-09 End-to-End Prototype Integration configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-09 end-to-end pipeline driver.
+# Loaded by `customer_segmentation.prototype.end_to_end.config_loader`.
+#
+# Layout
+# ------
+#   dev09_end_to_end:
+#     schema_version: "1.0.0"           # Pinned; bump invalidates e2e_run_id
+#     stage_selection:
+#       algorithm: "kmeans"             # closed set; default per ADR-0003
+#       skip_visualization: false
+#       skip_marketing: false
+#     display:
+#       disclaimer_text: "..."          # single source of mandatory disclaimer
+#       separator: "  "
+#     storage:
+#       output_dir_relative: "end_to_end"
+#     logging:
+#       level: "INFO"
+#       format: "%(asctime)s | ..."
+#       emit_to_console: true
+#     persistence:
+#       copy_manifests: true
+#     research_safety:
+#       never_promote_to_research: true
+#       end_to_end_scope: "END_TO_END_PROTOTYPE"
+#
+# Hard rules
+# ----------
+# - Stage selection is closed-set; ``algorithm`` MUST be one of
+#   ``kmeans``, ``agglomerative``, ``dbscan``, ``gmm``, ``fuzzy_cmeans``.
+# - ``schema_version`` is pinned to "1.0.0" (matches
+#   ``END_TO_END_SCHEMA_VERSION``).
+# - ``research_safety.never_promote_to_research`` is always True.
+# - The DEV-09 config does NOT override per-stage configs. Each stage
+#   loads its own canonical config. This file only controls
+#   orchestration-level choices (default algorithm, skip flags,
+#   disclaimer text, log format).
+#
+# Status: TECHNICALLY_IMPLEMENTED (DEV-09), NOT RESEARCH_APPROVED.
+# DEV-09 output is prototype-only. The research_safety block is always:
+#   automatically_promoted_to_research: false
+#   appeared_in_research_evidence: false
+#   scope: "END_TO_END_PROTOTYPE"
+# ---------------------------------------------------------------------------
+
+dev09_end_to_end:
+  # ---------------------------------------------------------------
+  # Schema version (pinned; bump invalidates e2e_run_id).
+  # Bump chỉ khi summary schema thay đổi incompatibly.
+  # ---------------------------------------------------------------
+  schema_version: "1.0.0"
+
+  # ---------------------------------------------------------------
+  # Stage selection.
+  # algorithm: default algorithm to use for clustering
+  #   (overridable via CLI flag --algorithm).
+  # skip_visualization: skip the visualization stage entirely
+  #   (still persists the run summary with status=SKIPPED).
+  # skip_marketing: skip the marketing stage entirely
+  #   (still persists the run summary with status=SKIPPED).
+  # ---------------------------------------------------------------
+  stage_selection:
+    algorithm: "kmeans"
+    skip_visualization: false
+    skip_marketing: false
+
+  # ---------------------------------------------------------------
+  # Display conventions.
+  # disclaimer_text: mandatory disclaimer included in summary text.
+  # separator: column separator for text tables.
+  # ---------------------------------------------------------------
+  display:
+    disclaimer_text: "no ranking, recommendation, or winner annotation is emitted; values are post-preprocessing (scaled/transformed) — not directly interpretable in original business units"
+    separator: "  "
+
+  # ---------------------------------------------------------------
+  # Storage layout.
+  # output_dir_relative: relative directory name under the per-dataset
+  #   end-to-end container (canonical layout:
+  #   <storage_root>/datasets/<ds_id>/end_to_end/<e2e_run_id>/).
+  # ---------------------------------------------------------------
+  storage:
+    output_dir_relative: "end_to_end"
+
+  # ---------------------------------------------------------------
+  # Per-stage logging (mirrors DEV-04..08 layout).
+  # ---------------------------------------------------------------
+  logging:
+    level: "INFO"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+    emit_to_console: true
+
+  # ---------------------------------------------------------------
+  # Persistence behaviour.
+  # copy_manifests: when true, copies the per-stage manifest files
+  #   (preprocessed_manifest.json, clustering_manifest.json, etc.)
+  #   into the run_dir next to e2e_run.json. Failures are non-fatal.
+  # ---------------------------------------------------------------
+  persistence:
+    copy_manifests: true
+
+  # ---------------------------------------------------------------
+  # Research safety (defence-in-depth; mirror DEV-04..08).
+  # Always sets end_to_end_scope = "END_TO_END_PROTOTYPE" so the
+  # end-to-end orchestrator never auto-promotes to research evidence.
+  # ---------------------------------------------------------------
+  research_safety:
+    never_promote_to_research: true
+    end_to_end_scope: "END_TO_END_PROTOTYPE"

@@ -110,6 +110,9 @@ logs/
 !/data/external/
 !/data/external/.gitkeep
 
+# data/prototype (DEV-02 — prototype dataset storage, scope=IMPORTED_PROTOTYPE)
+/data/prototype/**
+
 # Generated reports and figures
 /reports/**
 !/reports/
@@ -144,3 +147,13 @@ logs/
 .pyright/
 *.tmp
 *.bak
+# DEV-03 consistency test fixture (per docs/system/DEV-03_preprocessing.md §6.1.4):
+# A sample of Online Retail transactions used as input for
+# test_dev03_consistency.AC 38a (always run) + AC 38b (C7-dependent opt-in).
+# Manually regenerated from ``data/raw/primary/Online Retail.xlsx`` by the
+# developer following the plan. NOT committed because the data is derived
+# from the raw dataset (per AGENTS.md §2.12 spirit).
+# To regenerate, see ``docs/system/DEV-03_preprocessing.md`` §14.
+/tests/fixtures/consistency_input.csv
+!/tests/fixtures/
+!/tests/fixtures/.gitkeep

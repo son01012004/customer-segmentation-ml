@@ -1,0 +1,160 @@
+# ---------------------------------------------------------------------------
+# DEV-07 Prototype Marketing Module configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-07 prototype marketing
+# recommendation pipeline.
+# Loaded by `customer_segmentation.prototype.marketing.config_loader`.
+#
+# Layout
+# ------
+#   dev07_marketing:
+#     schema_version: "1.0.0"            # Pinned; bump invalidates marketing_id
+#     availability_default: "REVIEW_REQUIRED"  # per SYS-01 §6.7 FR-MKT-01
+#     mkt_framework:
+#       path_relative: "docs/marketing"   # Phase B: framework lookup
+#       version_pattern: "^MKT-01\\.\\.05__v\\d+(?:\\.\\d+)*$"
+#                                       # Canonical aggregate form (ADR-0008)
+#                                       # The loader constructs the aggregate
+#                                       # form "MKT-01..05__vN" from per-file
+#                                       # version extracted from filenames. The
+#                                       # configured pattern MUST match this
+#                                       # aggregate form for the framework to
+#                                       # be accepted.
+#     display:
+#       percentage_decimals: 2
+#       missing_value_placeholder: "--"
+#       csv_missing_value: ""
+#       disclaimer_text: "no marketing recommendation, ranking, or winner annotation is emitted; descriptive view only"
+#     storage:
+#       output_dir_relative: "marketing"
+#     logging:
+#       level: "INFO"
+#       format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+#       log_dir_relative: "data/prototype/datasets"
+#       emit_to_console: true
+#     research_safety:
+#       readonly_paths:
+#         - "data/raw/primary"
+#         - "data/raw/backup"
+#         - "data/processed"
+#         - "reports"
+#       never_promote_to_research: true
+#       marketing_scope: "MARKETING_PROTOTYPE"
+#     validation:
+#       forbid_internal_metrics_as_kpi: true
+#       forbid_marketing_terminology: true
+#       require_no_duplicate_segment_id: true
+#       exclude_dbscan_noise: true
+#
+# Status: TECHNICALLY_IMPLEMENTED (DEV-07 Phase A), NOT RESEARCH_APPROVED.
+# DEV-07 output is prototype-only. The research_safety block is always:
+#   automatically_promoted_to_research: false
+#   appeared_in_research_evidence: false
+#   scope: "MARKETING_PROTOTYPE"
+#
+# Per owner decision (2026-10-10):
+#   - ADR-0008: canonical version form is aggregate MKT-01..05__vN
+#     (Option A). ``mkt_framework.version_pattern`` updated accordingly.
+#   - OQ-D07-02: implement Phase A (REVIEW_REQUIRED shell) ngay.
+#   - OQ-D07-03: CP-04 §4.1-§4.3 dùng cho Segment naming, KHÔNG phải
+#     MKT mapping methodology. Phase A KHÔNG thực hiện mapping.
+#   - OQ-D07-06: giữ nguyên HTML `#/marketing` placeholder (SYS-06 §9 S-13).
+#   - OQ-D07-07: KHÔNG tạo ADR mới (ADR-0005 đã cover prototype layer).
+#   - OQ-D07-08: read-only; KHÔNG CSV/JSONL export ở Phase A.
+# ---------------------------------------------------------------------------
+
+dev07_marketing:
+  # ---------------------------------------------------------------
+  # Schema version (pinned; bump invalidates marketing_id).
+  # Bump chỉ khi Phase B thay đổi E-MKT schema shell.
+  # ---------------------------------------------------------------
+  schema_version: "1.0.0"
+
+  # ---------------------------------------------------------------
+  # Default availability khi Phase A (MKT framework absent).
+  # Per SYS-01 §6.7 FR-MKT-01: chỉ hiển thị khi MKT framework tồn tại.
+  # Khi MKT absent → REVIEW_REQUIRED cho tất cả segment hợp lệ.
+  # Segment với is_interpretation_ready=False (CP-05) → NOT_AVAILABLE.
+  # ---------------------------------------------------------------
+  availability_default: "REVIEW_REQUIRED"
+
+  # ---------------------------------------------------------------
+  # MKT framework location (Phase B trigger; ignored ở Phase A).
+  # ---------------------------------------------------------------
+  mkt_framework:
+    path_relative: "docs/marketing"
+    # Canonical aggregate form per ADR-0008 (Option A).
+    # The loader constructs "MKT-01..05__vN" from per-file versions
+    # extracted from MKT-NN__vN.md filenames; this regex MUST match the
+    # aggregate form for the framework to be accepted.
+    version_pattern: "^MKT-01\\.\\.05__v\\d+(?:\\.\\d+)*$"
+
+  # ---------------------------------------------------------------
+  # Display conventions.
+  # CLI/display: "--" cho missing value.
+  # CSV (Phase B): blank cell — KHÔNG dùng ở Phase A.
+  # percentage_decimals: rounding precision cho per-segment percentage
+  # trong display (Phase A read-only manifest only).
+  # disclaimer_text: single allowed occurrence của "marketing" trong
+  # DEV-07 output; per AGENTS.md §2.5.
+  # ---------------------------------------------------------------
+  display:
+    percentage_decimals: 2
+    missing_value_placeholder: "--"
+    csv_missing_value: ""
+    disclaimer_text: "no marketing recommendation, ranking, or winner annotation is emitted; descriptive view only"
+
+  # ---------------------------------------------------------------
+  # Storage
+  # DEV-07 writes under:
+  #   <storage_root>/datasets/<dataset_id>/preprocessed/<preprocessed_id>/clustering/<clustering_id>/segmentation/<segmentation_id>/marketing/<marketing_id>/
+  # The storage root is read from configs/dev02_dataset_management.yaml
+  # (shared with DEV-02/03/04/05/06). CLI does NOT have --storage-root override.
+  # ---------------------------------------------------------------
+  storage:
+    output_dir_relative: "marketing"
+    # Phase A: chỉ emit manifest JSON. CSV + JSONL đã bị owner loại
+    # bỏ ở OQ-D07-08 (read-only).
+    emit_manifest_json: true
+    emit_recommendations_csv: false
+    emit_recommendations_jsonl: false
+
+  # ---------------------------------------------------------------
+  # Per-stage logging (mirrors DEV-04 / DEV-05 / DEV-06 layout).
+  # ---------------------------------------------------------------
+  logging:
+    level: "INFO"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+    log_dir_relative: "data/prototype/datasets"
+    emit_to_console: true
+
+  # ---------------------------------------------------------------
+  # Research safety (defence-in-depth; mirror DEV-04/05/06).
+  # Always sets marketing_scope = "MARKETING_PROTOTYPE" so the
+  # prototype layer never auto-promotes to research evidence.
+  # ---------------------------------------------------------------
+  research_safety:
+    readonly_paths:
+      - "data/raw/primary"
+      - "data/raw/backup"
+      - "data/processed"
+      - "reports"
+    never_promote_to_research: true
+    marketing_scope: "MARKETING_PROTOTYPE"
+
+  # ---------------------------------------------------------------
+  # Input validation.
+  # forbid_internal_metrics_as_kpi: chặn silhouette/DBI/CH/WCSS/ARI/AMI
+  #   trong KPI field (FR-MKT-05, CON-07). Phase A: kpi=None nên tự
+  #   động pass; blocklist vẫn enforced cho validation.
+  # forbid_marketing_terminology: chặn "champion", "loyal", "VIP",
+  #   "at-risk", "churn", "LTV", "CLV" trong output text.
+  # require_no_duplicate_segment_id: defensive check trên DEV-06 input.
+  # exclude_dbscan_noise: chặn segment_id=-1 (FR-MKT-06, CON-08).
+  # ---------------------------------------------------------------
+  validation:
+    forbid_internal_metrics_as_kpi: true
+    forbid_marketing_terminology: true
+    require_no_duplicate_segment_id: true
+    exclude_dbscan_noise: true

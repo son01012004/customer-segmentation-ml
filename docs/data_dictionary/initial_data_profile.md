@@ -1,27 +1,35 @@
 # Initial Data Profile — UCI Online Retail (Primary, FE-01)
 
-This profile summarises the raw primary dataset at the level demanded by FE-01. Every number is computed live from the raw data by [`scripts/run_fe01_audit.py`](../../scripts/run_fe01_audit.py); no statistics are hard-coded here.
+> **Quy ước ngôn ngữ:** Tiếng Việt cho phần diễn giải; giữ nguyên
+> tiếng Anh cho tên cột, identifier, dtype, status, command theo
+> convention hiện có. Mọi con số (row count, missing count/rate, range)
+> truy xuất được về `reports/fe01/primary_*.csv` (xem cuối file).
 
-## 1. Dataset overview
+Profile này tóm tắt raw primary dataset ở mức FE-01 yêu cầu. Mọi con số
+được tính live từ raw data bởi
+[`scripts/run_fe01_audit.py`](../../scripts/run_fe01_audit.py); không có
+statistic nào được hard-code ở đây.
 
-| Field | Value |
+## 1. Tổng quan dataset
+
+| Trường | Giá trị |
 | --- | --- |
 | Dataset name | UCI Online Retail |
-| Role | Primary |
+| Vai trò | Primary |
 | Local file | `data/raw/primary/Online Retail.xlsx` |
-| Sheet name | `Online Retail` (of 1 sheet(s)) |
+| Sheet name | `Online Retail` (trong tổng 1 sheet) |
 | Total rows | **541,909** |
 | Total columns | **8** |
 | In-memory size (deep) | 132,310,571 bytes |
 | Source | UCI Machine Learning Repository — dataset ID 352 |
 | License | CC BY 4.0 |
 
-## 2. Dataset dimensions
+## 2. Kích thước dataset
 
 - Rows: **541,909**
 - Columns: **8**
 
-Columns (in order):
+Cột (theo thứ tự):
 
 - `InvoiceNo` — `object`
 - `StockCode` — `object`
@@ -42,11 +50,15 @@ Unparsed: 0
 Duplicate timestamps: 537667
 ```
 
-**Implication for FE-02 / RFM.** The dataset covers just over one year (December 2010 – December 2011). A reference date for the **Recency** computation must be chosen as part of the RFM stage (FE-02 / PR-XX). Per `configs/features.yaml` the default mode is `snapshot_max` (max InvoiceDate + 1 day); this is **not** modified by FE-01.
+**Hệ quả cho FE-02 / RFM.** Dataset bao trùm hơn một năm (tháng 12 năm
+2010 – tháng 12 năm 2011). Reference date cho việc tính **Recency** phải
+được chọn như một phần của stage RFM (FE-02 / PR-XX). Theo
+`configs/features.yaml`, mode mặc định là `snapshot_max` (max
+`InvoiceDate` + 1 day); FE-01 **không** sửa giá trị này.
 
-## 4. Column overview
+## 4. Tổng quan cột
 
-| Column | dtype | Role |
+| Cột | dtype | Vai trò |
 | --- | --- | --- |
 | `InvoiceNo` | `object` | Identifier (transaction) |
 | `StockCode` | `object` | Identifier (product) |
@@ -57,12 +69,12 @@ Duplicate timestamps: 537667
 | `CustomerID` | `float64` | Identifier (customer) |
 | `Country` | `str` | Categorical Feature |
 
-## 5. Missing-data profile
+## 5. Profile missing-data
 
-| Column | Missing Count | Missing Rate (%) | Notes |
+| Cột | Missing Count | Missing Rate (%) | Ghi chú |
 | --- | ---: | ---: | --- |
-| `CustomerID` | 135,080 | 24.9267 | Large share (~24.93%). Decision required in preprocessing. |
-| `Description` | 1,454 | 0.2683 | Small share (~0.27%). Decision required in preprocessing. |
+| `CustomerID` | 135,080 | 24.9267 | Tỷ lệ lớn (~24.93%). Cần quyết định trong preprocessing. |
+| `Description` | 1,454 | 0.2683 | Tỷ lệ nhỏ (~0.27%). Cần quyết định trong preprocessing. |
 | `Country` | 0 | 0.0000 | — |
 | `InvoiceDate` | 0 | 0.0000 | — |
 | `InvoiceNo` | 0 | 0.0000 | — |
@@ -70,17 +82,17 @@ Duplicate timestamps: 537667
 | `StockCode` | 0 | 0.0000 | — |
 | `UnitPrice` | 0 | 0.0000 | — |
 
-## 6. Numerical profile
+## 6. Profile numerical
 
-| Column | Count | Missing | Min | Max | Mean | Median | Std | Zero count | Negative count |
+| Cột | Count | Missing | Min | Max | Mean | Median | Std | Zero count | Negative count |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `Quantity` | 541,909 | 0 | -80995.0 | 80995.0 | 9.5522 | 3.0000 | 218.0812 | 0 | 10,624 |
 | `UnitPrice` | 541,909 | 0 | -11062.06 | 38970.0 | 4.6111 | 2.0800 | 96.7599 | 2,515 | 2 |
 | `CustomerID` | 406,829 | 135,080 | 12346.0 | 18287.0 | 15287.6906 | 15152.0000 | 1713.6003 | 0 | 0 |
 
-## 7. Categorical profile
+## 7. Profile categorical
 
-| Column | Count | Missing | Unique | Top values (value:count) |
+| Cột | Count | Missing | Unique | Top values (value:count) |
 | --- | ---: | ---: | ---: | --- |
 | `InvoiceNo` | 541,909 | 0 | 25,900 | 573585:1114;581219:749;581492:731;580729:721;558475:705;579777:687;581217:676;537434:675;580730:662;538071:652 |
 | `StockCode` | 541,909 | 0 | 4,070 | 85123A:2313;22423:2203;85099B:2159;47566:1727;20725:1639;84879:1502;22720:1477;22197:1476;21212:1385;20727:1350 |
@@ -107,32 +119,36 @@ Duplicate timestamps: 537667
 | Finland | 695 | 0.1283 |
 | Cyprus | 622 | 0.1148 |
 
-## 8. Identifier profile
+## 8. Profile identifier
 
-| Column | Total | Missing | Unique | Duplicate | Unique rate (%) | Is unique? |
+| Cột | Total | Missing | Unique | Duplicate | Unique rate (%) | Is unique? |
 | --- | ---: | ---: | ---: | ---: | ---: | :---: |
 | `InvoiceNo` | 541,909 | 0 | 25,900 | 516,009 | 4.7794 | ❌ |
 | `StockCode` | 541,909 | 0 | 4,070 | 537,839 | 0.7510 | ❌ |
 | `CustomerID` | 541,909 | 135,080 | 4,372 | 402,457 | 1.0747 | ❌ |
 
-### 8.1 `InvoiceNo` — cancellation-prefix scan
+### 8.1 `InvoiceNo` — scan tiền tố cancellation
 
-- Values with prefix `"C"`: **9,288** (1.7139 % of non-null `InvoiceNo`).
-- Examples: `C536379`, `C536383`, `C536391`, `C536391`, `C536391`
+- Giá trị có tiền tố `"C"`: **9,288** (1.7139 % trên `InvoiceNo` non-null).
+- Ví dụ: `C536379`, `C536383`, `C536391`, `C536391`, `C536391`.
 
-## 9. Transaction profile
+## 9. Profile transaction
 
-The unit of observation is **transaction-line** (one row per product on an invoice). The intended modelling unit is **customer**. Aggregation to customer-level is **not** performed in FE-01.
+Unit of observation là **transaction-line** (một row trên một sản phẩm
+trong invoice). Modelling unit dự kiến là **customer**. Aggregation lên
+customer-level **không** được thực hiện trong FE-01.
 
-| Level | Column(s) | Count (distinct) |
+| Cấp | Cột | Count (distinct) |
 | --- | --- | ---: |
 | Invoice | `InvoiceNo` | 25,900 |
 | Product (StockCode) | `StockCode` | 4,070 |
 | Customer (CustomerID) | `CustomerID` | 4,372 |
 
-**Invoice structure.** The `(InvoiceNo, StockCode)`-level yields 531,225 unique combinations out of 541,909 rows. Multiple rows per invoice is expected because each invoice contains multiple products.
+**Cấu trúc invoice.** Cấp `(InvoiceNo, StockCode)` cho ra 531,225 tổ
+hợp duy nhất trên tổng 541,909 row. Một invoice có nhiều row là điều
+bình thường vì mỗi invoice chứa nhiều sản phẩm.
 
-## 10. Duplicate profile
+## 10. Profile duplicate
 
 | Pattern | Duplicate rows |
 | --- | ---: |
@@ -140,23 +156,27 @@ The unit of observation is **transaction-line** (one row per product on an invoi
 | `(InvoiceNo, StockCode)`-key duplicates | 10,684 |
 | `(InvoiceNo, StockCode, Description, Quantity, InvoiceDate)`-key duplicates | 5,427 |
 
-## 11. Data-quality observations
+## 11. Quan sát data-quality
 
-Full report: [`reports/fe01/primary_data_quality_observations.md`](../../reports/fe01/primary_data_quality_observations.md).
+Báo cáo đầy đủ:
+[`reports/fe01/primary_data_quality_observations.md`](../../reports/fe01/primary_data_quality_observations.md).
 
 # Primary Dataset — Data Quality Observations (FE-01)
 
-All numbers below are computed live from `data/raw/primary/Online Retail.xlsx`. This document is a **read-only** observation report. No rows are modified, no values are imputed, no records are dropped.
+Mọi con số dưới đây được tính live từ `data/raw/primary/Online Retail.xlsx`.
+Tài liệu này là **read-only** observation report. Không row nào bị sửa,
+không value nào bị impute, không record nào bị drop.
 
 ## 1. Top-level snapshot
 
 - Rows: **541,909**
 - Columns: **8**
-- Columns: `InvoiceNo`, `StockCode`, `Description`, `Quantity`, `InvoiceDate`, `UnitPrice`, `CustomerID`, `Country`
+- Columns: `InvoiceNo`, `StockCode`, `Description`, `Quantity`, `InvoiceDate`,
+  `UnitPrice`, `CustomerID`, `Country`
 
 ## 2. Missing values
 
-| Column | Missing count | Missing rate (%) |
+| Cột | Missing count | Missing rate (%) |
 | --- | ---: | ---: |
 | `CustomerID` | 135,080 | 24.9267 |
 | `Description` | 1,454 | 0.2683 |
@@ -167,20 +187,21 @@ All numbers below are computed live from `data/raw/primary/Online Retail.xlsx`. 
 | `StockCode` | 0 | 0.0000 |
 | `UnitPrice` | 0 | 0.0000 |
 
-**Observation.** Negative/zero values are *not* handled here (see section 5); missing-value policy is owned by the preprocessing stage.
+**Quan sát.** Negative/zero value *không* được xử lý ở đây (xem mục 5);
+missing-value policy thuộc preprocessing stage.
 
 ## 3. Identifiers
 
-| Column | Unique count | Duplicate count | Missing count | Is unique? |
+| Cột | Unique count | Duplicate count | Missing count | Is unique? |
 | --- | ---: | ---: | ---: | :---: |
 | `InvoiceNo` | 25,900 | 516,009 | 0 | ❌ |
 | `StockCode` | 4,070 | 537,839 | 0 | ❌ |
 | `CustomerID` | 4,372 | 402,457 | 135,080 | ❌ |
 
-### 3.1 InvoiceNo — cancellation-prefix scan
+### 3.1 InvoiceNo — scan tiền tố cancellation
 
-- Found **9,288** values with prefix `"C"` (1.7139%).
-- Examples: `C536379`, `C536383`, `C536391`, `C536391`, `C536391`
+- Phát hiện **9,288** giá trị có tiền tố `"C"` (1.7139%).
+- Ví dụ: `C536379`, `C536383`, `C536391`, `C536391`, `C536391`.
 
 ## 4. Duplicates
 
@@ -190,17 +211,21 @@ All numbers below are computed live from `data/raw/primary/Online Retail.xlsx`. 
 | `(InvoiceNo, StockCode)`-level duplicates | 10,684 |
 | `(InvoiceNo, StockCode)`-level unique combinations | 531,225 |
 
-**Observation.** A given `InvoiceNo` naturally appears on multiple rows because an invoice contains multiple products. Duplicate `InvoiceNo` values are therefore **not** data errors; they are the structure of invoice-line-level data.
+**Quan sát.** Một `InvoiceNo` nhất định tự nhiên xuất hiện trên nhiều
+row vì một invoice chứa nhiều sản phẩm. `InvoiceNo` duplicate **không
+phải** data error; đó là cấu trúc của dữ liệu invoice-line.
 
 ## 5. Numerical anomalies (read-only)
 
-| Column | zero_count | negative_count | min | max |
+| Cột | zero_count | negative_count | min | max |
 | --- | ---: | ---: | ---: | ---: |
 | `Quantity` | 0 | 10,624 | -80995.0 | 80995.0 |
 | `UnitPrice` | 2,515 | 2 | -11062.06 | 38970.0 |
 | `CustomerID` | 0 | 0 | 12346.0 | 18287.0 |
 
-**Observation.** Negative quantities / unit prices and zero values are recorded here **without any policy decision**. They are flagged for the preprocessing stage.
+**Quan sát.** Negative quantity / unit price và zero value được ghi ở
+đây **mà không có bất kỳ policy decision nào**. Chúng được đánh dấu
+cho preprocessing stage.
 
 ## 6. Date coverage
 
@@ -208,23 +233,24 @@ All numbers below are computed live from `data/raw/primary/Online Retail.xlsx`. 
 - Unparseable rows: **0**
 - Min: `2010-12-01T08:26:00`
 - Max: `2011-12-09T12:50:00`
-- Rows sharing a timestamp with another row: **537,667** (expected — multiple products can be bought at the same instant).
+- Row chia sẻ timestamp với row khác: **537,667** (expected — nhiều
+  sản phẩm có thể được mua cùng một thời điểm).
 
+## 12. So sánh schema Primary vs Backup
 
-## 12. Primary vs Backup — schema comparison
-
-### 12.1 Backup overview
+### 12.1 Tổng quan Backup
 
 | Sheet | Rows | Columns | Date min | Date max |
 | --- | ---: | ---: | --- | --- |
 | `Year 2009-2010` | 525,461 | 8 | 2009-12-01T07:45:00 | 2010-12-09T20:01:00 |
 | `Year 2010-2011` | 541,910 | 8 | 2010-12-01T08:26:00 | 2011-12-09T12:50:00 |
 
-### 12.2 Column-name differences
+### 12.2 Khác biệt tên cột
 
-The backup uses **different column names** compared to the primary. The shared logical concepts are listed below.
+Backup dùng **tên cột khác** so với primary. Các logical concept chung
+được liệt kê dưới đây.
 
-| Logical concept | Primary column | Backup column | Backup dtype matches primary? |
+| Logical concept | Primary column | Backup column | Backup dtype khớp primary? |
 | --- | --- | --- | :---: |
 | Invoice number | `InvoiceNo` | `Invoice` | ❌ |
 | Product code | `StockCode` | `StockCode` | ✅ |
@@ -235,30 +261,60 @@ The backup uses **different column names** compared to the primary. The shared l
 | Customer id | `CustomerID` | `Customer ID` | ❌ |
 | Country | `Country` | `Country` | ✅ |
 
-### 12.3 Coverage and row-level difference
+### 12.3 Coverage và khác biệt row-level
 
-- The primary spans **2010-12-01 → 2011-12-09** (≈ 1 year). Backup sheet `Year 2010-2011` covers the same date window.
-- Backup sheet `Year 2009-2010` extends the time coverage by **one additional year** (2009-12-01 → 2010-12-09). This is the main reason the backup is kept as a robustness / coverage fallback.
-- The two datasets use **different column names** for invoice number, unit price, and customer id (see 12.2). Any code that consumes both must apply a renaming map at the loader layer (PR-XX task).
+- Primary bao trùm **2010-12-01 → 2011-12-09** (≈ 1 năm). Sheet backup
+  `Year 2010-2011` bao trùm cùng cửa sổ ngày.
+- Sheet backup `Year 2009-2010` mở rộng time coverage thêm **một năm**
+  (2009-12-01 → 2010-12-09). Đây là lý do chính backup được giữ làm
+  robustness / coverage fallback.
+- Hai dataset dùng **tên cột khác nhau** cho invoice number, unit price,
+  và customer id (xem 12.2). Bất kỳ code nào consume cả hai phải áp
+  dụng rename map ở loader layer (task PR-XX).
 
-### 12.4 Row-level comparison (Primary vs Backup `Year 2010-2011`)
+### 12.4 So sánh row-level (Primary vs Backup `Year 2010-2011`)
 
-- Primary rows: **541,909**. Backup `Year 2010-2011` rows: **541,910** (delta **+1**).
-- Compared on the join key `(InvoiceNo, StockCode, InvoiceDate)`: **531,232** rows are present in both; **0** rows are only in the primary; **1** rows are only in the backup.
-- The single extra row in the backup is: `InvoiceNo=581587`, `StockCode=POST`, `InvoiceDate=2011-12-09 12:50:00`. After renaming `Invoice→InvoiceNo`, `Price→UnitPrice`, `Customer ID→CustomerID`, this row corresponds to a single `POSTAGE` line for `CustomerID=12680` (country: France).
-- **Implication**: the claim "matches the primary row-for-row" is **not accurate**. FE-01 records the precise delta instead. Whether the missing-vs-extra line should be kept, dropped, or otherwise reconciled is a preprocessing decision (PR-XX / FE-02) and is **not** resolved here.
+- Primary rows: **541,909**. Backup `Year 2010-2011` rows: **541,910**
+  (delta **+1**).
+- So sánh theo join key `(InvoiceNo, StockCode, InvoiceDate)`:
+  **531,232** row hiện diện ở cả hai; **0** row chỉ ở primary; **1**
+  row chỉ ở backup.
+- Row thừa duy nhất ở backup là: `InvoiceNo=581587`, `StockCode=POST`,
+  `InvoiceDate=2011-12-09 12:50:00`. Sau khi rename `Invoice→InvoiceNo`,
+  `Price→UnitPrice`, `Customer ID→CustomerID`, row này tương ứng với
+  một dòng `POSTAGE` duy nhất cho `CustomerID=12680` (country: France).
+- **Hệ quả**: claim "khớp primary row-for-row" là **không chính xác**.
+  FE-01 ghi lại delta chính xác thay vào đó. Việc missing-vs-extra line
+  nên được keep, drop, hoặc reconcile là quyết định preprocessing
+  (PR-XX / FE-02) và **không** được giải quyết ở đây.
 
-## 13. Implications for the next stage (preprocessing)
+## 13. Hệ quả cho stage tiếp theo (preprocessing)
 
-FE-01 deliberately does **not** decide the preprocessing rules. The following implications are listed so the next stage has a single page to triage. Each item must be resolved by an ADR **before** it is implemented.
+FE-01 cố ý **không** quyết định preprocessing rule. Các hệ quả sau được
+liệt kê để stage tiếp theo có một trang duy nhất để triage. Mỗi mục
+phải được giải quyết bằng một ADR **trước khi** implement.
 
-- `CustomerID` is missing in ≈ 24.93 % of rows. Decide: drop, impute (e.g. via invoice grouping heuristics), or model guests separately.
-- Negative `Quantity` rows (≈ 10,624) coincide with `C`-prefixed `InvoiceNo` rows (≈ 9,288). Decide a unified cancellation rule.
-- `UnitPrice` has 2,515 zero-valued rows and 2 negative-valued rows. Decide: drop, impute, or treat as a separate flag.
-- `Description` has 1,454 missing rows. Decide whether to drop the affected lines, treat missing as a separate label, or ignore the column for the modelling matrix.
-- `StockCode` is mostly numeric but contains alphanumeric codes (e.g. '85123A', 'POST', 'M'). Decide whether to keep them as strings or to special-case postage / manual entries.
-- Backup dataset has different column names (`Invoice` / `Price` / `Customer ID`). A canonical rename map must be defined if the backup is ever loaded into the modelling pipeline.
-- Decide a canonical reference date for RFM. The audit gives the raw max `InvoiceDate` so the choice can be made later without re-reading the data.
-- Decide which duplicates to keep when (InvoiceNo, StockCode, Description, Quantity, InvoiceDate) coincide. The audit reports 5,427 such rows.
+- `CustomerID` missing ở ≈ 24.93 % row. Quyết định: drop, impute (vd.
+  qua invoice grouping heuristics), hoặc model guest riêng.
+- Negative `Quantity` row (≈ 10,624) trùng với row `C`-prefixed
+  `InvoiceNo` (≈ 9,288). Quyết định một cancellation rule thống nhất.
+- `UnitPrice` có 2,515 row zero-value và 2 row negative-value. Quyết
+  định: drop, impute, hoặc xem như một flag riêng.
+- `Description` có 1,454 row missing. Quyết định drop các line bị ảnh
+  hưởng, treat missing như một label riêng, hoặc bỏ qua cột cho
+  modelling matrix.
+- `StockCode` phần lớn là numeric nhưng chứa code alphanumeric (vd.
+  '85123A', 'POST', 'M'). Quyết định giữ chúng dưới dạng string hay
+  special-case postage / manual entry.
+- Dataset backup có tên cột khác (`Invoice` / `Price` / `Customer ID`).
+  Một canonical rename map phải được định nghĩa nếu backup từng được
+  load vào modelling pipeline.
+- Quyết định canonical reference date cho RFM. Audit đưa ra raw max
+  `InvoiceDate` để choice có thể được đưa ra sau mà không cần đọc lại
+  data.
+- Quyết định duplicate nào được giữ khi `(InvoiceNo, StockCode,
+  Description, Quantity, InvoiceDate)` trùng nhau. Audit báo cáo
+  5,427 row như vậy.
 
-FE-01 finishes here. The next stage (FE-02 / PR-XX) takes these implications as input.
+FE-01 kết thúc tại đây. Stage tiếp theo (FE-02 / PR-XX) lấy các hệ quả
+này làm input.

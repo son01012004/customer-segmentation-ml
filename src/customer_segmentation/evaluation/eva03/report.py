@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from customer_segmentation.evaluation.eva03.types import HungarianAssignment
@@ -39,12 +40,45 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
+def _format_scalar(value: Any) -> str:
+    """Format a single DataFrame cell for Markdown output.
+
+    Floats are rendered with ``.6g`` precision to mirror the previous
+    ``to_markdown(..., floatfmt=".6g")`` behaviour without depending
+    on the ``tabulate`` package. ``None`` and ``NaN`` are rendered as
+    empty cells. Everything else is rendered via :func:`str`.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if np.isnan(value) or np.isinf(value):
+            return ""
+        return f"{value:.6g}"
+    return str(value)
+
+
 def _df_to_markdown(df: pd.DataFrame, *, max_rows: int = 200) -> str:
-    """Render a small DataFrame as a markdown table."""
+    """Render a small DataFrame as a Markdown table (no ``tabulate``).
+
+    This helper mirrors the previously-used
+    ``df.head(max_rows).to_markdown(index=False, floatfmt=".6g")``
+    format but uses only ``pandas`` + ``numpy`` + ``str`` so the
+    EVA-03 reports do not introduce a new runtime dependency on
+    ``tabulate``. Per DEV-06 OQ-SEG-DEPENDENCY-01, the owner has
+    DECIDED to keep EVA-06 / downstream reports free of ``tabulate``.
+    """
     if df is None or df.empty:
         return "_(no rows)_\n"
     view = df.head(max_rows)
-    return view.to_markdown(index=False, floatfmt=".6g") + "\n"
+    cols = [str(c) for c in view.columns]
+    lines = [
+        "| " + " | ".join(cols) + " |",
+        "| " + " | ".join(["---"] * len(cols)) + " |",
+    ]
+    for _, row in view.iterrows():
+        cells = [_format_scalar(row[c]) for c in view.columns]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines) + "\n"
 
 
 def _perp_blockr_summary(per_pair: list[Any]) -> list[dict[str, Any]]:
@@ -147,7 +181,7 @@ def build_reproducibility_report(
                         ],
                     }
                 )
-                parts.append(small.to_markdown(index=False, floatfmt=".6g"))
+                parts.append(_df_to_markdown(small, max_rows=200))
                 parts.append("\n")
     else:
         parts.append("_(no Hungarian pairs produced)_\n")

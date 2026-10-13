@@ -1,5 +1,9 @@
 # ADR-0003 — Algorithm Scope: Five-Algorithm Benchmark
 
+> **Quy ước ngôn ngữ:** Tiếng Việt cho phần diễn giải; giữ nguyên
+> tiếng Anh cho identifier, command, file path, status, EPIC ID theo
+> convention hiện có.
+
 ## Status
 
 Accepted
@@ -18,85 +22,124 @@ Researcher / Mentor
 
 ## Context
 
-The repository documentation (README.md, AGENTS.md, FE-05, FE-06, and related methodology docs) previously claimed the benchmark scope consists of four clustering algorithms: **K-Means, K-Medoids, Agglomerative Clustering, and DBSCAN**.
+Tài liệu repository (README.md, AGENTS.md, FE-05, FE-06, và các tài
+liệu methodology liên quan) trước đây claim rằng benchmark scope gồm
+bốn thuật toán clustering: **K-Means, K-Medoids, Agglomerative
+Clustering, và DBSCAN**.
 
-Investigation of the actual implementation revealed:
+Điều tra implementation thực tế phát hiện:
 
-1. `src/customer_segmentation/clustering/kmedoids.py` contains only `raise NotImplementedError("fit_kmedoids is not implemented yet.")` — no functional implementation.
-2. `configs/clustering.yaml` has `kmedoids: enabled: true` but with `metric: "TODO"` and `init: "TODO"`.
-3. `AlgorithmRegistry.list_registered()` returns exactly five names: `kmeans`, `agglomerative`, `dbscan`, `gmm`, `fuzzy_cmeans`. K-Medoids is **not registered**.
-4. EXP-01 through EXP-05 ran exactly **five** algorithms: K-Means, Agglomerative, DBSCAN, GMM, Fuzzy C-Means.
-5. EPIC-06 documentation contract describes six ML documents (ML-01 through ML-06), where ML-06 covers Fuzzy C-Means and the "Algorithm Baseline" — consistent with five working adapters.
-6. The `AGENTS.md` §3 table lists "4 fixed algorithms" including K-Medoids, creating a documented contradiction with the implemented system.
+1. `src/customer_segmentation/clustering/kmedoids.py` chỉ chứa
+   `raise NotImplementedError("fit_kmedoids is not implemented yet.")`
+   — không có implementation chức năng.
+2. `configs/clustering.yaml` có `kmedoids: enabled: true` nhưng với
+   `metric: "TODO"` và `init: "TODO"`.
+3. `AlgorithmRegistry.list_registered()` trả về chính xác năm tên:
+   `kmeans`, `agglomerative`, `dbscan`, `gmm`, `fuzzy_cmeans`.
+   K-Medoids **không** được registered.
+4. EXP-01 đến EXP-05 chạy chính xác **năm** thuật toán: K-Means,
+   Agglomerative, DBSCAN, GMM, Fuzzy C-Means.
+5. EPIC-06 documentation contract mô tả sáu tài liệu ML (ML-01 đến
+   ML-06), trong đó ML-06 bao trùm Fuzzy C-Means và "Algorithm Baseline"
+   — nhất quán với năm adapter hoạt động.
+6. Bảng `AGENTS.md` §3 liệt kê "4 fixed algorithms" bao gồm K-Medoids,
+   tạo ra mâu thuẫn document với hệ thống đã implement.
 
-There is no empirical evidence that K-Medoids was ever run in any experiment. The four-algorithm claim in AGENTS.md and related documentation is inconsistent with the five-algorithm implementation.
+Không có evidence thực nghiệm nào cho thấy K-Medoids từng được chạy
+trong bất kỳ experiment nào. Claim bốn thuật toán trong AGENTS.md và tài
+liệu liên quan không nhất quán với implementation năm thuật toán.
 
 ## Decision
 
-The benchmark algorithm scope is **five algorithms**:
+Benchmark algorithm scope là **năm thuật toán**:
 
-1. **K-Means** (`kmeans`) — hard centroid-based clustering
-2. **Agglomerative Clustering** (`agglomerative`) — hierarchical clustering with Ward linkage
-3. **DBSCAN** (`dbscan`) — density-based clustering
-4. **Gaussian Mixture Model** (`gmm`) — probabilistic model-based clustering
-5. **Fuzzy C-Means** (`fuzzy_cmeans`) — soft/fuzzy clustering with Bezdek update equations
+1. **K-Means** (`kmeans`) — hard centroid-based clustering.
+2. **Agglomerative Clustering** (`agglomerative`) — hierarchical clustering
+   với Ward linkage.
+3. **DBSCAN** (`dbscan`) — density-based clustering.
+4. **Gaussian Mixture Model** (`gmm`) — probabilistic model-based clustering.
+5. **Fuzzy C-Means** (`fuzzy_cmeans`) — soft/fuzzy clustering với Bezdek
+   update equations.
 
-**K-Medoids** is explicitly **DEFERRED / OUT OF SCOPE** for the current research phase (EPIC-06 through EPIC-08).
+**K-Medoids** được tường minh **DEFERRED / OUT OF SCOPE** cho research
+phase hiện tại (EPIC-06 đến EPIC-08).
 
-This decision applies to:
-- EPIC-06 (clustering experiment framework and adapters)
-- EPIC-07 (controlled experiments: EXP-01 through EXP-05)
-- EPIC-08 (stability and evaluation)
+Quyết định này áp dụng cho:
 
-K-Medoids may be reconsidered for a future research phase (e.g., EPIC-X) via a new ADR.
+- EPIC-06 (clustering experiment framework và adapters).
+- EPIC-07 (controlled experiments: EXP-01 đến EXP-05).
+- EPIC-08 (stability và evaluation).
+
+K-Medoids có thể được reconsider cho một research phase trong tương lai
+(vd. EPIC-X) qua một ADR mới.
 
 ## Consequences
 
-### Easier
+### Dễ hơn
 
-- Documentation is now consistent with the implemented system (185 runs across 5 algorithms).
-- No misleading claim that a fourth algorithm was benchmarked when it was not.
-- EPIC-08 can proceed with a clear, verified algorithm scope.
-- RQ1 evaluation covers exactly the algorithms that have experimental evidence.
+- Tài liệu giờ nhất quán với hệ thống đã implement (185 run qua 5
+  thuật toán).
+- Không còn claim gây hiểu nhầm rằng thuật toán thứ tư đã được
+  benchmark trong khi thực tế không phải.
+- EPIC-08 có thể tiến hành với algorithm scope rõ ràng, đã được
+  verify.
+- RQ1 evaluation bao trùm chính xác các thuật toán có experimental
+  evidence.
 
-### Harder or Riskier
+### Khó hơn hoặc rủi ro hơn
 
-- Readers expecting a four-algorithm benchmark per earlier docs may be confused. This is mitigated by explicit documentation of the change.
-- Any future claim comparing against K-Medoids literature will be incomplete. This is acceptable given the current research scope.
+- Người đọc kỳ vọng benchmark bốn thuật toán theo tài liệu trước có
+  thể bị bối rối. Điều này được giảm thiểu bằng document tường minh
+  về thay đổi.
+- Bất kỳ claim tương lai nào so sánh với K-Medoids literature sẽ
+  không đầy đủ. Điều này chấp nhận được trong research scope hiện tại.
 
 ## Alternatives Considered
 
-### Option A: Implement K-Medoids + Rerun EXP-01 through EXP-05
+### Option A: Implement K-Medoids + Rerun EXP-01 đến EXP-05
 
-- **Estimated impact**: ~70–90 new experimental runs across 5 experiments.
-- **Additional dependency**: `scikit-learn-extra` (requires ADR for new dependency).
-- **New tests**: ~15–20 tests in `tests/test_ml07_kmedoids.py`.
-- **Timeline**: ~2–4 weeks for implementation, testing, and reruns.
-- **Decision**: Rejected for the current phase. The implementation cost is disproportionate to the research benefit, given that 185 runs on 5 algorithms already provide substantial evidence for RQ1. K-Medoids can be added in a future phase.
+- **Estimated impact**: ~70–90 experimental run mới qua 5 experiment.
+- **Additional dependency**: `scikit-learn-extra` (yêu cầu ADR cho
+  dependency mới).
+- **Test mới**: ~15–20 test trong `tests/test_ml07_kmedoids.py`.
+- **Timeline**: ~2–4 tuần cho implementation, testing, và rerun.
+- **Decision**: Bị reject cho phase hiện tại. Implementation cost mất
+  cân đối so với research benefit, vì 185 run trên 5 thuật toán đã
+  cung cấp evidence đáng kể cho RQ1. K-Medoids có thể được thêm vào
+  một phase tương lai.
 
-### Option B: Update Documentation to Reflect Five-Algorithm Scope (CHOSEN)
+### Option B: Cập nhật tài liệu để phản ánh Five-Algorithm Scope (ĐÃ CHỌN)
 
-- **Estimated impact**: Documentation updates only; zero experimental reruns.
-- **Additional dependency**: None.
-- **Timeline**: ~2–3 days for documentation.
-- **Decision**: Accepted. This aligns documentation with the implemented system and removes the misleading K-Medoids claim without disrupting the existing evidence base.
+- **Estimated impact**: Chỉ cập nhật tài liệu; không rerun thí nghiệm.
+- **Additional dependency**: Không có.
+- **Timeline**: ~2–3 ngày cho tài liệu.
+- **Decision**: Được chấp nhận. Cách này align tài liệu với hệ thống
+  đã implement và loại bỏ K-Medoids claim gây hiểu nhầm mà không phá
+  vỡ evidence base hiện tại.
 
 ## Scope of This Decision
 
-This ADR covers:
-- EPIC-06 (ML-01 through ML-06 algorithm adapters)
-- EPIC-07 (EXP-01 through EXP-05)
-- EPIC-08 (stability and evaluation)
+ADR này bao trùm:
 
-This ADR does NOT:
-- Prevent future implementation of K-Medoids in a separate research phase
-- Change the interpretation boundary for RQ1 (no "best algorithm" claim)
-- Affect the validity of existing experimental results (185 runs on 5 algorithms remain valid)
+- EPIC-06 (ML-01 đến ML-06 algorithm adapters).
+- EPIC-07 (EXP-01 đến EXP-05).
+- EPIC-08 (stability và evaluation).
+
+ADR này KHÔNG:
+
+- Ngăn cản implementation K-Medoids trong tương lai ở một research
+  phase riêng.
+- Thay đổi ranh giới diễn giải cho RQ1 (không có claim "best algorithm").
+- Ảnh hưởng tới tính hợp lệ của kết quả thí nghiệm hiện tại
+  (185 run trên 5 thuật toán vẫn hợp lệ).
 
 ## References
 
-- `src/customer_segmentation/clustering/kmedoids.py` — placeholder only
-- `src/customer_segmentation/clustering/registry.py` — `list_registered()` excludes kmedoids
-- `configs/clustering.yaml` — `kmedoids: enabled: true` with `metric: "TODO"`
-- EXP-01 through EXP-05 manifests — all reference exactly 5 algorithms
-- `docs/research/review/METHODOLOGY_RESOLUTION_PROPOSAL.md` — analysis leading to this decision
+- `src/customer_segmentation/clustering/kmedoids.py` — placeholder only.
+- `src/customer_segmentation/clustering/registry.py` — `list_registered()`
+  loại trừ kmedoids.
+- `configs/clustering.yaml` — `kmedoids: enabled: true` với
+  `metric: "TODO"`.
+- EXP-01 đến EXP-05 manifests — tất cả tham chiếu chính xác 5 thuật toán.
+- `docs/research/review/METHODOLOGY_RESOLUTION_PROPOSAL.md` — analysis
+  dẫn đến quyết định này.

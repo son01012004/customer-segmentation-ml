@@ -1109,7 +1109,7 @@ document covers them as follows:
 - Algorithm scope (ADR-0003): [`docs/decisions/0003-algorithm-scope.md`](../../decisions/0003-algorithm-scope.md)
 - Algorithm theory: [`docs/research/ALGORITHM_THEORY_AND_EXPERIMENTAL_COMPARISON.md`](../../research/ALGORITHM_THEORY_AND_EXPERIMENTAL_COMPARISON.md)
 - Data dictionary: [`docs/data_dictionary/data_dictionary.md`](../../data_dictionary/data_dictionary.md)
-- AGENTS.md (operating rules): [`../../AGENTS.md`](../../../AGENTS.md)
+- AGENTS.md (operating rules): [`../../AGENTS.md`](../../AGENTS.md)
 
 ---
 

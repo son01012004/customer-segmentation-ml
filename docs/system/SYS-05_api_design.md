@@ -3,6 +3,7 @@
 > **Mã tài liệu:** SYS-05
 > **Tên:** **API Design**
 > **Trạng thái:** `WORKING_DRAFT v0.1`
+> **Phase status:** `FUTURE_WORK` — Không implement trong current prototype phase (per ADR-0005 Option A, 2026-10-08). SYS-05 được giữ làm API design reference cho EPIC-12 và các phase sau. Trong current prototype phase, hệ thống dùng CLI + scripts + filesystem (xem ADR-0005).
 > **Ngày:** 2026-10-07
 > **Phạm vi:** Đặc tả contract API cho **Customer Segmentation ML**.
 > **Đối tượng đọc:** Backend engineer, ML engineer, FE developer (sau này), reviewer nghiên cứu.
@@ -66,6 +67,13 @@ Mục tiêu:
    **upload dataset → run preprocessing → train → evaluate → profile → report**
    mà không cần SSH vào worker.
 
+> **Lưu ý về phase hiện tại (per ADR-0005 Option A):** Trong current
+> prototype phase, hệ thống **KHÔNG** triển khai backend REST API. Tài liệu
+> SYS-05 này phục vụ: (1) design reference cho EPIC-12 production frontend
+> và production backend, (2) API contract nếu một phase sau muốn thêm API
+> layer. Toàn bộ API endpoint schemas, error codes, request/response
+> structures, OpenAPI patterns dưới đây được giữ nguyên làm reference.
+
 ### 1.2 Phạm vi (in-scope)
 
 - API cho **admin / configuration** (xem Nhóm A).
@@ -86,6 +94,25 @@ Mục tiêu:
   expose qua API.
 - **Streaming inference online** — sản phẩm là batch research tool, không phải
   online serving. Mọi endpoint "predict" ở đây là predict-theo-batch.
+
+### 1.4 Out of scope cho current prototype phase (per ADR-0005)
+
+Các thành phần dưới đây thuộc **FUTURE_WORK** và KHÔNG được triển khai
+trong current prototype phase (per ADR-0005 Option A, 2026-10-08):
+
+- Backend REST API service (FastAPI / Flask / Django / bất kỳ framework nào).
+- ML worker process / microservice tách rời khỏi operator CLI.
+- Job queue (RQ / Celery / custom / cloud queue).
+- Metadata database (PostgreSQL / SQLite / MongoDB / cloud DB).
+- ORM (SQLAlchemy / Tortoise / Django ORM).
+- OpenAPI server / API runtime implementation.
+- Production authentication / authorization (Login / JWT / session / mTLS).
+- Production frontend (React / Vue / Svelte SPA).
+
+Trong current prototype phase, mọi ML execution chạy **trực tiếp** từ
+`scripts/run_*.py` → `src/customer_segmentation/*` (per SYS-02 §5).
+SYS-05 API design content ở các Nhóm A–G dưới đây được giữ nguyên làm
+**design reference** cho EPIC-12.
 
 ---
 
@@ -170,6 +197,14 @@ tả resource, **chưa** bao gồm bất kỳ parameter ML cụ thể nào.
 ```
 
 > Hình này là diễn giải trực quan. Nguồn runtime view: `SYS-02` §5.
+
+> **Footnote (per ADR-0005, 2026-10-08):** Diagram trên mô tả production-ready
+> system (mục tiêu EPIC-12). Trong current prototype phase, hệ thống hoạt
+> động theo mô hình đơn giản hơn nhiều: Operator chạy `python scripts/run_*.py`
+> → gọi trực tiếp `src/customer_segmentation/*` → ghi artifacts ra filesystem
+> (`data/`, `reports/`). Không có HTTP service, không có worker process, không
+> có database. Xem ADR-0005 và `docs/system/DEV-01_project_setup.md` §2
+> Architecture Contract.
 
 Mọi thành phần giao tiếp với worker thông qua **internal Python API**
 (`customer_segmentation.*`) và job queue. Boundary HTTP chỉ có ở
@@ -1714,6 +1749,15 @@ implementation phase. Mỗi mục kèm nhãn `WORKING_ASSUMPTION` / `REVIEW_REQU
 14. **OpenAPI generation.** Tài liệu này dùng OpenAPI 3.1 như **mục tiêu
     schema** (`CONTRACT_REQUIRED`); cơ chế sinh (Pydantic, manual YAML,
     …) là `IMPLEMENTATION_OPTION`.
+15. **ARCH-OPT-A-01 (RESOLVED 2026-10-08):** Có nên triển khai API layer
+    (REST / GraphQL) trong current prototype phase không?
+    Resolution: **NO** per ADR-0005 Option A. Trong current prototype phase,
+    không có backend REST API service, không có ML worker process, không có
+    job queue, không có metadata database. Toàn bộ ML execution chạy từ
+    `scripts/run_*.py` → `src/customer_segmentation/*`. SYS-05 được giữ làm
+    API design reference cho EPIC-12 (và phase sau nếu cần API layer). Nếu
+    sau này muốn thêm API / backend / database, phải tạo ADR mới supersede
+    ADR-0005 (per `docs/decisions/README.md` immutability rule).
 
 ---
 
