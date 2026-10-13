@@ -1,40 +1,63 @@
 # Data Dictionary — UCI Online Retail (Primary, FE-01)
 
-This data dictionary is the **canonical reference** for the raw primary dataset used in the customer-segmentation research. It documents every column at the level the team has agreed to (per the DS-05 decision and FE-01 audit).
+Data dictionary này là **canonical reference** cho raw primary dataset
+được dùng trong nghiên cứu customer-segmentation. Nó document mọi cột ở
+mức mà team đã thống nhất (theo quyết định DS-05 và audit FE-01).
 
-- **Dataset**: UCI Online Retail (Primary) — see [`docs/decisions/0001-primary-dataset-uci-online-retail.md`](../decisions/0001-primary-dataset-uci-online-retail.md).
-- **File**: `data/raw/primary/Online Retail.xlsx` (see also [`dataset_provenance.md`](./dataset_provenance.md) for SHA-256 and source URL).
-- **Sheet**: `Online Retail` (the file has 1 sheet(s)).
+- **Dataset**: UCI Online Retail (Primary) — xem
+  [`docs/decisions/0001-primary-dataset-uci-online-retail.md`](../decisions/0001-primary-dataset-uci-online-retail.md).
+- **File**: `data/raw/primary/Online Retail.xlsx` (xem thêm
+  [`dataset_provenance.md`](./dataset_provenance.md) cho SHA-256 và
+  source URL).
+- **Sheet**: `Online Retail` (file có 1 sheet).
 - **Rows**: **541,909**
 - **Columns**: **8**
 
-## Notes on the canonical filename
+> **Quy ước ngôn ngữ:** Tiếng Việt cho phần diễn giải; giữ nguyên
+> tiếng Anh cho tên cột, identifier, dtype, value, range theo convention
+> hiện có của repository. Các con số (row count, missing count/rate,
+> range) truy xuất được về `reports/fe01/primary_*.csv` (xem cuối file).
 
-`configs/dataset.yaml` declares the canonical primary filename as `online_retail.xlsx`, but the actual file on disk is `Online Retail.xlsx`. The file has **not** been renamed (see [`dataset_provenance.md`](./dataset_provenance.md) for the full discussion). The schema and column meanings below describe the columns **as they appear in the actual file on disk**.
+## Ghi chú về canonical filename
 
-## Column reference
+`configs/dataset.yaml` khai báo canonical primary filename là
+`online_retail.xlsx`, nhưng file thực tế trên đĩa là
+`Online Retail.xlsx`. File **chưa được đổi tên** (xem
+[`dataset_provenance.md`](./dataset_provenance.md) cho thảo luận đầy
+đủ). Schema và ý nghĩa cột dưới đây mô tả các cột **đúng theo file
+thực tế trên đĩa**.
 
-| Column | Data Type | Role | Meaning | Unit | Source | Missing Count | Missing Rate | Unique Values | Expected Range | Business Meaning |
+## Tham chiếu cột
+
+| Cột | Data Type | Vai trò | Ý nghĩa | Đơn vị | Nguồn | Missing Count | Missing Rate | Unique Values | Expected Range | Business Meaning |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- |
-| `InvoiceNo` | `object` | Identifier (transaction) | 6-digit integral invoice number. A leading 'C' marks a cancellation in the original UCI dataset convention. | code | UCI Online Retail (raw primary file) | 0 | 0.0000 | 25,900 | [N/A (mixed types), N/A (mixed types)] | Used to group transaction lines into a single customer purchase event and to identify cancellations ('C' prefix). |
-| `StockCode` | `object` | Identifier (product) | 5-digit integral product (item) code. May be alphanumeric (e.g. '85123A'). | code | UCI Online Retail (raw primary file) | 0 | 0.0000 | 4,070 | [N/A (mixed types), N/A (mixed types)] | Used to distinguish products and to compute product-level diversity features per customer. |
-| `Description` | `object` | Categorical Feature (text) | Product (item) name as recorded in the invoice line. | text | UCI Online Retail (raw primary file) | 1,454 | 0.2683 | 4,223 | [N/A (mixed types), N/A (mixed types)] | Free-text product label. Useful for product taxonomy work, but **not** used directly as a clustering feature. |
-| `Quantity` | `int64` | Numerical Feature (transaction-line) | The quantities of each product (item) per transaction. | items | UCI Online Retail (raw primary file) | 0 | 0.0000 | 722 | [-80995.0, 80995.0] | Used (after preprocessing decisions) to derive monetary value and basket-size features. |
-| `InvoiceDate` | `datetime64[us]` | Date Feature (transaction) | Day and time when each transaction was generated. | datetime | UCI Online Retail (raw primary file) | 0 | 0.0000 | 23,260 | [2010-12-01 08:26:00, 2011-12-09 12:50:00] | Used to compute Recency and purchase-cadence features at the customer level. |
-| `UnitPrice` | `float64` | Numerical Feature (transaction-line) | Product price per unit, in sterling (£). | GBP (£) | UCI Online Retail (raw primary file) | 0 | 0.0000 | 1,630 | [-11062.06, 38970.0] | Used (after preprocessing decisions) to compute Monetary (= sum(Quantity * UnitPrice)) per customer. |
-| `CustomerID` | `float64` | Identifier (customer) | 5-digit integral customer number, unique per customer. Missing in ~24.93% of rows in the raw primary file. | code | UCI Online Retail (raw primary file) | 135,080 | 24.9267 | 4,372 | [12346.0, 18287.0] | Customer-level join key for the modelling unit. Cannot meaningfully aggregate customers without this column. |
-| `Country` | `str` | Categorical Feature | Name of the country where each customer resides. | category | UCI Online Retail (raw primary file) | 0 | 0.0000 | 38 | [Australia, Unspecified] | Behavioural attribute used for segmentation by geography. Mostly UK in the raw data (~91.4%). |
+| `InvoiceNo` | `object` | Identifier (transaction) | 6-digit integral invoice number. Leading 'C' đánh dấu cancellation theo convention UCI. | code | UCI Online Retail (raw primary file) | 0 | 0.0000 | 25,900 | [N/A (mixed types), N/A (mixed types)] | Dùng để nhóm các transaction line vào một purchase event và để nhận diện cancellation (tiền tố 'C'). |
+| `StockCode` | `object` | Identifier (product) | 5-digit integral product (item) code. Có thể là alphanumeric (vd. '85123A'). | code | UCI Online Retail (raw primary file) | 0 | 0.0000 | 4,070 | [N/A (mixed types), N/A (mixed types)] | Dùng để phân biệt sản phẩm và tính các feature product-level diversity cho mỗi customer. |
+| `Description` | `object` | Categorical Feature (text) | Product (item) name như ghi trong invoice line. | text | UCI Online Retail (raw primary file) | 1,454 | 0.2683 | 4,223 | [N/A (mixed types), N/A (mixed types)] | Free-text product label. Hữu ích cho product taxonomy, nhưng **không** dùng trực tiếp làm clustering feature. |
+| `Quantity` | `int64` | Numerical Feature (transaction-line) | Số lượng sản phẩm (item) trên mỗi transaction. | items | UCI Online Retail (raw primary file) | 0 | 0.0000 | 722 | [-80995.0, 80995.0] | Dùng (sau preprocessing) để derive monetary value và basket-size features. |
+| `InvoiceDate` | `datetime64[us]` | Date Feature (transaction) | Ngày và giờ khi transaction được sinh ra. | datetime | UCI Online Retail (raw primary file) | 0 | 0.0000 | 23,260 | [2010-12-01 08:26:00, 2011-12-09 12:50:00] | Dùng để tính Recency và purchase-cadence features ở customer level. |
+| `UnitPrice` | `float64` | Numerical Feature (transaction-line) | Giá sản phẩm trên mỗi đơn vị, tính bằng sterling (£). | GBP (£) | UCI Online Retail (raw primary file) | 0 | 0.0000 | 1,630 | [-11062.06, 38970.0] | Dùng (sau preprocessing) để tính Monetary (= sum(Quantity * UnitPrice)) cho mỗi customer. |
+| `CustomerID` | `float64` | Identifier (customer) | 5-digit integral customer number, unique per customer. Missing ở ~24.93% row trong raw primary file. | code | UCI Online Retail (raw primary file) | 135,080 | 24.9267 | 4,372 | [12346.0, 18287.0] | Customer-level join key cho modelling unit. Không thể aggregate customer nếu thiếu cột này. |
+| `Country` | `str` | Categorical Feature | Tên quốc gia nơi customer cư trú. | category | UCI Online Retail (raw primary file) | 0 | 0.0000 | 38 | [Australia, Unspecified] | Behavioural attribute dùng để segment theo geography. Chủ yếu là UK trong raw data (~91.4%). |
 
-## Identifier hierarchy
+## Phân cấp identifier
 
-The dataset's unit of observation is **transaction-line**. The intended modelling unit is **customer**.
+Unit of observation của dataset là **transaction-line**. Modelling unit
+dự kiến là **customer**.
 
-| Level | Column | Notes |
+| Cấp | Cột | Ghi chú |
 | --- | --- | --- |
-| Transaction | `InvoiceNo` | A single invoice spans multiple rows (one per product). Prefix `C` marks a cancellation. |
-| Product | `StockCode` | Distinct product/item code. May be alphanumeric. |
-| Customer | `CustomerID` | Missing in ≈ 24.93 % of raw rows — must be addressed in preprocessing. |
+| Transaction | `InvoiceNo` | Một invoice có nhiều row (mỗi row một sản phẩm). Tiền tố `C` đánh dấu cancellation. |
+| Product | `StockCode` | Mã sản phẩm riêng biệt. Có thể là alphanumeric. |
+| Customer | `CustomerID` | Missing ở ≈ 24.93% raw row — phải xử lý trong preprocessing. |
 
-## Source of every number in this file
+## Nguồn của mọi con số trong file này
 
-All numbers in this document come from [`reports/fe01/primary_missing.csv`](../../reports/fe01/primary_missing.csv), [`reports/fe01/primary_numerical.csv`](../../reports/fe01/primary_numerical.csv), and [`reports/fe01/primary_schema.csv`](../../reports/fe01/primary_schema.csv). They are computed live by [`scripts/run_fe01_audit.py`](../../scripts/run_fe01_audit.py) and the docs are regenerated by [`scripts/generate_fe01_docs.py`](../../scripts/generate_fe01_docs.py).
+Mọi con số trong tài liệu này đến từ
+[`reports/fe01/primary_missing.csv`](../../reports/fe01/primary_missing.csv),
+[`reports/fe01/primary_numerical.csv`](../../reports/fe01/primary_numerical.csv),
+và [`reports/fe01/primary_schema.csv`](../../reports/fe01/primary_schema.csv).
+Chúng được tính live bởi
+[`scripts/run_fe01_audit.py`](../../scripts/run_fe01_audit.py) và docs
+được sinh lại bởi
+[`scripts/generate_fe01_docs.py`](../../scripts/generate_fe01_docs.py).

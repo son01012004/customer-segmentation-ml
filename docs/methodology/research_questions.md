@@ -1,36 +1,45 @@
 # Research Questions
 
-> **Status:** METHODOLOGY_LOCKED (per ADR-0004)
-> **Date:** 2026-09-22
-> **Source:** ADR-0004 — `docs/decisions/0004-research-questions.md`
+> **Trạng thái:** METHODOLOGY_LOCKED (theo ADR-0004)
+> **Ngày:** 2026-09-22
+> **Nguồn:** ADR-0004 — `docs/decisions/0004-research-questions.md`
 
-This document records the three official Research Questions for the customer segmentation project. Each RQ is defined with its population, dataset, scope, evidence base, and interpretation boundary.
+Tài liệu này ghi lại ba Research Question chính thức cho dự án customer
+segmentation. Mỗi RQ được định nghĩa với population, dataset, scope,
+evidence base, và ranh giới diễn giải.
+
+> **Quy ước ngôn ngữ:** Tiếng Việt cho phần diễn giải; giữ nguyên
+> tiếng Anh cho tên trường, identifier, SHA-256, RQ ID, ADR ID, code,
+> status enum, và thuật ngữ kỹ thuật theo convention hiện có.
 
 ---
 
 ## RQ1 — Algorithm Comparison Under Controlled Conditions
 
-> **Question:** How do different clustering algorithms perform on customer-level behavioral feature spaces derived from retail transactional data, under controlled experimental conditions?
+> **Câu hỏi:** Các thuật toán clustering khác nhau hoạt động thế nào trên
+> không gian feature behavioral cấp customer được rút ra từ dữ liệu
+> transactional bán lẻ, dưới các điều kiện thí nghiệm controlled?
 
-### Population and Unit of Analysis
+### Population và Unit of Analysis
 
-- **Unit**: Customer (one row per customer, identified by `CustomerID`)
-- **Observation count**: 4,371 customers
-- **Feature space**: R¹⁴ (14 features per customer)
+- **Unit**: Customer (một row trên một customer, định danh bằng `CustomerID`).
+- **Observation count**: 4,371 customers.
+- **Feature space**: R¹⁴ (14 features per customer).
 
 ### Dataset
 
 - **File**: `data/processed/final_clustering_dataset.parquet`
 - **SHA-256**: `ba54033e45525bf5123c2d9d3684b110676a84e81d4d505bb781a3be10980f9c`
 - **Version**: FE06-v1.0
-- **Source**: UCI Online Retail (primary dataset, per ADR-0001)
-- **Preprocessing**: FE-06 C7 (median imputation + Yeo-Johnson transformation + RobustScaler). Status: `WORKING_ASSUMPTION`.
+- **Source**: UCI Online Retail (primary dataset, theo ADR-0001)
+- **Preprocessing**: FE-06 C7 (median imputation + Yeo-Johnson transformation
+  + RobustScaler). Trạng thái: `WORKING_ASSUMPTION`.
 
 ### Feature Representation
 
 RFM Extended — 14 features:
 
-| # | Feature | FE-06 Status | Notes |
+| # | Feature | FE-06 Status | Ghi chú |
 |---|---|---|---|
 | 1 | Recency | ELIGIBLE | Days from last purchase to ReferenceDate |
 | 2 | Frequency | ELIGIBLE_WORKING_ASSUMPTION | nunique(InvoiceNo) |
@@ -47,94 +56,110 @@ RFM Extended — 14 features:
 | 13 | CancellationRate | ELIGIBLE_WORKING_ASSUMPTION | CancellationInvoiceCount / Frequency |
 | 14 | ReturnRate | ELIGIBLE_WORKING_ASSUMPTION | ReturnInvoiceCount / Frequency |
 
-Six features are in `ELIGIBLE_WORKING_ASSUMPTION` status. See FE-06 documentation §13 for pending review items.
+Sáu feature ở trạng thái `ELIGIBLE_WORKING_ASSUMPTION`. Xem tài liệu
+FE-06 §13 để biết các pending review item.
 
 ### Algorithm Scope
 
-Five algorithms (per ADR-0003):
+Năm thuật toán (theo ADR-0003):
 
-1. **K-Means** (`kmeans`) — sklearn implementation
-2. **Agglomerative Clustering** (`agglomerative`) — sklearn with Ward linkage
-3. **DBSCAN** (`dbscan`) — sklearn, density-based
-4. **Gaussian Mixture Model** (`gmm`) — sklearn, probabilistic
-5. **Fuzzy C-Means** (`fuzzy_cmeans`) — custom NumPy implementation
+1. **K-Means** (`kmeans`) — sklearn implementation.
+2. **Agglomerative Clustering** (`agglomerative`) — sklearn với Ward linkage.
+3. **DBSCAN** (`dbscan`) — sklearn, density-based.
+4. **Gaussian Mixture Model** (`gmm`) — sklearn, probabilistic.
+5. **Fuzzy C-Means** (`fuzzy_cmeans`) — custom NumPy implementation.
 
-K-Medoids is **OUT OF SCOPE** (per ADR-0003).
+K-Medoids là **OUT OF SCOPE** (theo ADR-0003).
 
 ### K Treatment
 
-- EXP-02 swept K ∈ [2, 10] step=1, identified 13 candidates via deterministic heuristic.
-- EXP-03 used K=3 as a controlled interaction point (from EXP-02 candidates).
-- K is treated per-experiment. No "best K" or "optimal K" claim is made.
-- Per-algorithm K candidates are reported as evidence.
+- EXP-02 swept K ∈ [2, 10] step=1, xác định 13 candidate qua deterministic
+  heuristic.
+- EXP-03 dùng K=3 làm controlled interaction point (từ EXP-02 candidates).
+- K được xử lý per-experiment. KHÔNG có claim "best K" hoặc "optimal K".
+- Per-algorithm K candidates được báo cáo dưới dạng evidence.
 
 ### Hyperparameter Treatment
 
-- EXP-03 performed sensitivity analysis per algorithm (Stage A: baseline; Stage B: single-parameter sweeps; Stage C: selected interactions).
-- Per-algorithm working selections produced via protocol: **silhouette primary → DBI → CH tiebreaker**.
-- Selection status = `WORKING_SELECTED` (not final approved; pending EPIC-08 validation).
-- Protocol documented in `docs/research/EXP03_HYPERPARAMETER_REVIEW.md`.
+- EXP-03 thực hiện sensitivity analysis per algorithm (Stage A: baseline;
+  Stage B: single-parameter sweeps; Stage C: selected interactions).
+- Per-algorithm working selection được sinh ra qua protocol:
+  **silhouette primary → DBI → CH tiebreaker**.
+- Selection status = `WORKING_SELECTED` (chưa final approved; đang chờ
+  EPIC-08 validation).
+- Protocol được document tại
+  `docs/research/EXP03_HYPERPARAMETER_REVIEW.md`.
 
 ### Quality Metrics
 
-Internal metrics only (no external validation):
+Chỉ internal metrics (không có external validation):
 
-| Metric | Description | Status |
+| Metric | Mô tả | Status |
 |---|---|---|
 | Silhouette Score | Mean pairwise distance ratio | PRIMARY |
 | Davies-Bouldin Index | Mean cluster similarity ratio | Tiebreaker 1 |
 | Calinski-Harabasz Index | Cluster separation vs dispersion | Tiebreaker 2 |
 | WCSS | Within-cluster sum of squares (arithmetic centroid) | Diagnostic only |
 
-Metric status schema: `VALID_VALUE`, `NOT_APPLICABLE`, `COMPUTATION_ERROR`, `MISSING`.
-Noise handling: DBSCAN noise points (label=-1) are excluded from internal metrics and WCSS.
+Metric status schema: `VALID_VALUE`, `NOT_APPLICABLE`, `COMPUTATION_ERROR`,
+`MISSING`. Noise handling: DBSCAN noise points (label=-1) bị loại khỏi
+internal metrics và WCSS.
 
 ### Runtime
 
-- Measured as algorithm execution time (excludes metric computation and artifact writing).
-- Protocol: n_repeat=5 per configuration for variance estimation.
-- Runtime data from EXP-01 through EXP-05.
+- Đo bằng algorithm execution time (loại trừ metric computation và
+  artifact writing).
+- Protocol: n_repeat=5 per configuration cho variance estimation.
+- Runtime data từ EXP-01 đến EXP-05.
 
 ### Reproducibility
 
-- Verified at EXP-05 Block R: 5/5 algorithms produce identical cluster labels across 5 repeats with seed=42.
-- Status: `REPRODUCIBILITY_VERIFIED`.
+- Đã verify tại EXP-05 Block R: 5/5 thuật toán tạo ra cluster labels
+  giống hệt nhau qua 5 repeat với seed=42.
+- Trạng thái: `REPRODUCIBILITY_VERIFIED`.
 
 ### Stability
 
 - EXP-05 Block S: seed sensitivity (K-Means, GMM, Fuzzy C-Means × 5 seeds).
-- EXP-05 Block N: feature perturbation (Gaussian noise, sigma ∈ {0, 0.01, 0.05} × column std).
-- ARI/AMI computation: **deferred to EPIC-08** using `exp05_cluster_labels.parquet` (327,825 rows × 9 columns).
+- EXP-05 Block N: feature perturbation (Gaussian noise,
+  sigma ∈ {0, 0.01, 0.05} × column std).
+- ARI/AMI computation: **deferred to EPIC-08** dùng
+  `exp05_cluster_labels.parquet` (327,825 rows × 9 columns).
 
-### Interpretation Boundary
+### Ranh giới diễn giải
 
-> **Prohibited terms (per AGENTS.md §2.5):** "best", "winner", "optimal", "recommended", "final", "superior".
+> **Thuật ngữ bị cấm (theo `AGENTS.md` §2.5):** "best", "winner",
+> "optimal", "recommended", "final", "superior".
 
-Cross-algorithm comparison is presented as evidence with explicit caveats. Composite scoring is prohibited.
+Cross-algorithm comparison được trình bày dưới dạng evidence với caveat
+rõ ràng. Composite scoring bị cấm.
 
 ---
 
 ## RQ2 — Preprocessing Sensitivity Under Fixed Feature Representation
 
-> **Question:** How does preprocessing strategy affect clustering quality under a fixed customer-level feature representation?
+> **Câu hỏi:** Chiến lược preprocessing ảnh hưởng thế nào đến clustering
+> quality dưới một feature representation cấp customer cố định?
 
-### Population and Unit of Analysis
+### Population và Unit of Analysis
 
-Same as RQ1 (4,371 customers, R¹⁴).
+Giống RQ1 (4,371 customers, R¹⁴).
 
 ### Dataset
 
-Same as RQ1.
+Giống RQ1.
 
 ### Independent Variable
 
-Preprocessing strategy — defined as transformation × scaling configuration applied to the fixed 14-feature set.
+Preprocessing strategy — được định nghĩa là cấu hình transformation ×
+scaling áp dụng lên bộ 14 feature cố định.
 
 ### Evidence
 
-EXP-04 Family B: 6 preprocessing scenarios × 5 repeats = 30 runs. All deterministic.
+EXP-04 Family B: 6 preprocessing scenario × 5 repeat = 30 run. Tất cả
+deterministic.
 
-| Scenario | Transformation | Scaling | Role |
+| Scenario | Transformation | Scaling | Vai trò |
 |---|---|---|---|
 | C0 | none | none | NO_TRANSFORM_NO_SCALING_REFERENCE |
 | C1 | none | standard | Candidate |
@@ -143,48 +168,55 @@ EXP-04 Family B: 6 preprocessing scenarios × 5 repeats = 30 runs. All determini
 | C6 | yeo_johnson | standard | Candidate |
 | C7 | yeo_johnson | robust | FE06_WORKING_CONFIGURATION_REFERENCE |
 
-### Limitation
+### Giới hạn
 
-- Single algorithm (K-Means) — preprocessing sensitivity may differ across algorithms.
-- Single K (K=4) — sensitivity may differ at different cluster counts.
-- **RFM-only vs RFM Extended comparison is NOT within scope of reformulated RQ2.** See `docs/research/review/RFM_ONLY_FUTURE_WORK_PLAN.md`.
+- Một thuật toán duy nhất (K-Means) — preprocessing sensitivity có thể
+  khác nhau giữa các thuật toán.
+- Một K duy nhất (K=4) — sensitivity có thể khác ở các cluster count khác.
+- **So sánh RFM-only vs RFM Extended KHÔNG nằm trong scope của RQ2 đã
+  reformulate.** Xem
+  `docs/research/review/RFM_ONLY_FUTURE_WORK_PLAN.md`.
 
 ---
 
 ## RQ3 — Stability and Reproducibility
 
-> **Question:** How reproducible and how robust are the clusterings produced by each algorithm under different seeds and feature-space perturbations?
+> **Câu hỏi:** Clustering do mỗi thuật toán tạo ra reproducible và robust
+> đến mức nào dưới các seed khác nhau và perturbation trên feature space?
 
-### Population and Unit of Analysis
+### Population và Unit of Analysis
 
-Same as RQ1 (4,371 customers, R¹⁴).
+Giống RQ1 (4,371 customers, R¹⁴).
 
 ### Dataset
 
-Same as RQ1.
+Giống RQ1.
 
 ### Reproducibility
 
-- EXP-05 Block R: 5 algorithms × n_repeat=5 × seed=42.
-- All 5 algorithms: `REPRODUCIBILITY_VERIFIED` (1 unique labels_hash across 5 repeats).
-- Status: VERIFIED.
+- EXP-05 Block R: 5 thuật toán × n_repeat=5 × seed=42.
+- Cả 5 thuật toán: `REPRODUCIBILITY_VERIFIED` (1 unique labels_hash qua
+  5 repeat).
+- Trạng thái: VERIFIED.
 
 ### Seed Stability
 
-- EXP-05 Block S: K-Means, GMM, Fuzzy C-Means × 5 seeds (42, 7, 123, 2024, 1729).
-- Agglomerative and DBSCAN are excluded (deterministic — no random axis).
-- Raw evidence: 15 runs. ARI/AMI computation deferred to EPIC-08.
+- EXP-05 Block S: K-Means, GMM, Fuzzy C-Means × 5 seeds
+  (42, 7, 123, 2024, 1729).
+- Agglomerative và DBSCAN bị loại (deterministic — không có random axis).
+- Raw evidence: 15 run. ARI/AMI computation deferred to EPIC-08.
 
 ### Perturbation Robustness
 
-- EXP-05 Block N: 5 algorithms × (sigma=0, 0.01, 0.05) × 3 perturbation seeds.
-- Total: 35 runs.
-- Sigma=0 sanity check: reproduces EXP-01 baseline (PASS).
+- EXP-05 Block N: 5 thuật toán × (sigma=0, 0.01, 0.05) × 3 perturbation
+  seeds.
+- Tổng: 35 run.
+- Sigma=0 sanity check: reproduce EXP-01 baseline (PASS).
 - ARI/AMI computation deferred to EPIC-08.
 
 ### Stability Metrics (EPIC-08 owned)
 
-| Metric | Description | Status |
+| Metric | Mô tả | Trạng thái |
 |---|---|---|
 | ARI | Adjusted Rand Index | EPIC-08 |
 | AMI | Adjusted Mutual Information | EPIC-08 |
@@ -192,28 +224,29 @@ Same as RQ1.
 | Statistical tests | Paired t-test / Wilcoxon | EPIC-08 plan |
 | Confidence intervals | Bootstrap / percentile | EPIC-08 plan |
 
-### Interpretation Boundary
+### Ranh giới diễn giải
 
-RQ3 does NOT cover:
-- Business interpretation of clusters (EPIC-09).
-- Customer profiling or segment naming (EPIC-09).
-- External validation against ground truth.
+RQ3 KHÔNG bao gồm:
+
+- Business interpretation của cluster (EPIC-09).
+- Customer profiling hoặc segment naming (EPIC-09).
+- External validation với ground truth.
 
 ---
 
-## RQ Coverage Summary
+## Tóm tắt độ phủ RQ
 
-| RQ | Evidence Available | Answerable? | Status |
+| RQ | Evidence hiện có | Trả lời được? | Trạng thái |
 |---|---|---|---|
-| RQ1 | EXP-01 (baseline), EXP-02 (K-sweep), EXP-03 (hyperparameter) | PARTIAL — quality evidence complete; stability analysis in EPIC-08 | METHODOLOGY_LOCKED |
-| RQ2 | EXP-04 Family B (preprocessing sensitivity) | PARTIAL — preprocessing sensitivity on RFM Extended; RFM-only comparison future work | METHODOLOGY_LOCKED |
-| RQ3 | EXP-05 Blocks R/S/N (raw evidence) | PARTIAL — evidence complete; ARI/AMI analysis in EPIC-08 | METHODOLOGY_LOCKED |
+| RQ1 | EXP-01 (baseline), EXP-02 (K-sweep), EXP-03 (hyperparameter) | PARTIAL — quality evidence đầy đủ; stability analysis ở EPIC-08 | METHODOLOGY_LOCKED |
+| RQ2 | EXP-04 Family B (preprocessing sensitivity) | PARTIAL — preprocessing sensitivity trên RFM Extended; RFM-only comparison là future work | METHODOLOGY_LOCKED |
+| RQ3 | EXP-05 Blocks R/S/N (raw evidence) | PARTIAL — evidence đầy đủ; ARI/AMI analysis ở EPIC-08 | METHODOLOGY_LOCKED |
 
 ---
 
-## References
+## Tham chiếu
 
 - ADR-0003: `docs/decisions/0003-algorithm-scope.md`
 - ADR-0004: `docs/decisions/0004-research-questions.md`
 - RFM-only future work: `docs/research/review/RFM_ONLY_FUTURE_WORK_PLAN.md`
-- Experiment reports: `reports/exp01/` through `reports/exp05/`
+- Experiment reports: `reports/exp01/` qua `reports/exp05/`

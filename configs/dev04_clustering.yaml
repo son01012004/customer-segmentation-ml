@@ -1,0 +1,149 @@
+# ---------------------------------------------------------------------------
+# DEV-04 Prototype Clustering Execution configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-04 prototype clustering pipeline.
+# Loaded by `customer_segmentation.prototype.clustering.config_loader`.
+#
+# Layout
+# ------
+#   dev04_clustering:
+#     algorithms:                    # Per-algorithm hyperparameters (mirror ML-01)
+#       kmeans: {...}
+#       agglomerative: {...}
+#       dbscan: {...}
+#       gmm: {...}
+#       fuzzy_cmeans: {...}
+#     random_seed:
+#       default: 42                # 3-level resolution: CLI > per-algo > default
+#       per_algorithm_override: {}
+#     logging:
+#       level: "INFO"
+#       format: ...
+#       log_dir_relative: "data/prototype/datasets"
+#       emit_to_console: true
+#     storage:
+#       output_dir_relative: "clustering"   # relative to preprocessed/ dir
+#       emit_algorithm_output: true        # write algorithm_output_*.parquet for GMM/FCM
+#     research_safety:
+#       readonly_paths: [...]                # defence-in-depth
+#       never_promote_to_research: true
+#     validation:
+#       min_samples: 2
+#       min_features: 1
+#       require_no_nan: true
+#       require_no_inf: true
+#       require_all_numeric: true
+#       exclude_customer_id_from_features: true
+#
+# Status: TECHNICALLY_IMPLEMENTED (DEV-04), NOT RESEARCH_APPROVED.
+# DEV-04 output is prototype-only. The research_safety block is always:
+#   automatically_promoted_to_research: false
+#   appeared_in_research_evidence: false
+#   scope: "CLUSTERED_PROTOTYPE"
+# ---------------------------------------------------------------------------
+
+dev04_clustering:
+  # ---------------------------------------------------------------
+  # Per-algorithm hyperparameters (mirror configs/clustering.yaml::algorithms)
+  # Each algorithm's defaults match ML-01 working assumptions.
+  # CLI flags override per-field (mirror DEV-02/DEV-03 pattern).
+  # ---------------------------------------------------------------
+  algorithms:
+    kmeans:
+      enabled: true
+      n_clusters: 4           # WORKING_ASSUMPTION (ML-02); not final
+      init: "k-means++"       # WORKING_ASSUMPTION
+      n_init: 10
+      max_iter: 300
+      tol: 1.0e-4
+
+    agglomerative:
+      enabled: true
+      n_clusters: 4           # WORKING_ASSUMPTION (ML-03); not final
+      linkage: "ward"         # WORKING_ASSUMPTION
+      metric: "euclidean"
+      compute_distances: true
+
+    dbscan:
+      enabled: true
+      eps: 0.5               # WORKING_ASSUMPTION (ML-04); not final
+      min_samples: 5          # WORKING_ASSUMPTION
+      metric: "euclidean"
+
+    gmm:
+      enabled: true
+      n_components: 4       # WORKING_ASSUMPTION (ML-05); not final
+      covariance_type: "full"  # WORKING_ASSUMPTION
+      init_params: "kmeans"   # WORKING_ASSUMPTION
+      tol: 1.0e-3
+      reg_covar: 1.0e-6
+      max_iter: 100
+      n_init: 1
+
+    fuzzy_cmeans:
+      enabled: true
+      n_clusters: 4           # WORKING_ASSUMPTION (ML-06); not final
+      fuzziness: 2.0         # WORKING_ASSUMPTION
+      max_iter: 300
+      error: 1.0e-4
+
+  # ---------------------------------------------------------------
+  # Random seed
+  # 3-level resolution: CLI --seed > per_algorithm_override > default
+  # Algorithms that do NOT support random_state (agglomerative, dbscan)
+  # are unaffected — runner sets seed_to_pass = None for them.
+  # ---------------------------------------------------------------
+  random_seed:
+    default: 42
+    # Example per-algorithm override:
+    #   per_algorithm_override:
+    #     gmm: 123
+    per_algorithm_override: {}
+
+  # ---------------------------------------------------------------
+  # Per-stage logging
+  # ---------------------------------------------------------------
+  logging:
+    level: "INFO"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+    log_dir_relative: "data/prototype/datasets"
+    emit_to_console: true
+
+  # ---------------------------------------------------------------
+  # Storage
+  # DEV-04 writes under:
+  #   <storage_root>/datasets/<dataset_id>/preprocessed/<preprocessed_id>/clustering/<clustering_id>/
+  # The storage root is read from configs/dev02_dataset_management.yaml
+  # (shared with DEV-02/DEV-03). CLI does NOT have --storage-root override.
+  # ---------------------------------------------------------------
+  storage:
+    # Relative path from the preprocessed/ directory.
+    # <preprocessed_dir>/clustering/<clustering_id>/
+    output_dir_relative: "clustering"
+    # Whether to write algorithm_output_*.parquet for soft algorithms (GMM/FCM).
+    emit_algorithm_output: true
+
+  # ---------------------------------------------------------------
+  # Research safety (defence-in-depth)
+  # ---------------------------------------------------------------
+  research_safety:
+    readonly_paths:
+      - "data/raw/primary"
+      - "data/raw/backup"
+      - "data/processed"
+      - "reports"
+    never_promote_to_research: true
+
+  # ---------------------------------------------------------------
+  # Input validation (mirrors ML-01 FrameworkConfig.validation)
+  # DEV-04 reads the DEV-03 ML Dataset, which already passed DEV-03
+  # validation. These settings mirror ML-01's validation policy.
+  # ---------------------------------------------------------------
+  validation:
+    min_samples: 2
+    min_features: 1
+    require_no_nan: true
+    require_no_inf: true
+    require_all_numeric: true
+    exclude_customer_id_from_features: true

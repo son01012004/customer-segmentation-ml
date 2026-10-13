@@ -38,6 +38,7 @@ khách hàng dưới các điều kiện thí nghiệm có kiểm soát.
 9. [Quy tắc bảo mật dữ liệu và Git](#9-quy-t%E1%BA%AFc-b%E1%BA%A3o-m%E1%BA%ADt-d%E1%BB%AF-li%E1%BB%87u-v%C3%A0-git)
 10. [Quy trình đóng góp](#10-quy-tr%C3%ACnh-%C4%91%C3%B3ng-g%C3%B3p)
 11. [Giấy phép](#11-gi%E1%BA%A5y-ph%C3%A9p)
+12. [Bàn giao giai đoạn TEST](#12-b%C3%A0n-giao-giai-%C4%91o%E1%BA%A1n-test)
 13. [Bảng chú giải thuật ngữ](#13-b%E1%BA%A3ng-ch%C3%BA-gi%E1%BA%A3i-thu%E1%BA%ADt-ng%E1%BB%AF)
 
 ---
@@ -204,7 +205,7 @@ Nếu bạn mới tham gia dự án, **đọc theo thứ tự dưới đây**.
   - §4: required workflow cho mọi non-trivial change.
   - §5: forbidden shortcuts.
   - §6: escalation — khi nào dừng và hỏi mentor.
-  - §12: data privacy (không commit raw/processed data).
+  - §2.12: data privacy (không commit raw/processed data).
 
 ### 5.2 Methodology (đọc thứ hai)
 
@@ -470,6 +471,52 @@ Tóm tắt các ràng buộc không thể thương lượng:
 
 Dự án phát hành theo **MIT License**. Xem
 [`LICENSE`](./LICENSE) để biết nội dung đầy đủ.
+
+---
+
+## 12. Bàn giao giai đoạn TEST
+
+> Phần này mô tả **trạng thái technical implementation**, KHÔNG đồng
+> nghĩa với **research approval** (xem `AGENTS.md` §2.10). Mọi quyết
+> định methodology cuối cùng thuộc về mentor / human researcher.
+
+**Báo cáo handoff hiện hành**:
+[`docs/system/DEV-10_handoff_report.md`](./docs/system/DEV-10_handoff_report.md)
+là điểm vào cho prototype layer (`DEV-02` → `DEV-09`) và cách chạy test
+trên dữ liệu thật UCI Online Retail. Đọc báo cáo đó trước khi chạy
+bất kỳ lệnh `scripts/dev0*.py` nào.
+
+**Verdict hiện tại (theo DEV-10):** `TECHNICALLY_IMPLEMENTED`.
+
+- Pipeline `DEV-02 → DEV-05` đã chạy được trên dữ liệu thật
+  (`data/raw/primary/Online Retail.xlsx`, 541,909 giao dịch → 4,371
+  customers × 14 features) và trên synthetic fixture.
+- 5 thuật toán benchmark (`ADR-0003`) đều được DEV-04 wrap và DEV-05
+  evaluate: K-Means, Agglomerative, DBSCAN, GMM, Fuzzy C-Means.
+- Test suite gần nhất: **2,094 passed, 1 skipped** (tổng 3,563
+  collectible tests; lệnh + reproduction xem DEV-10 §4).
+- Source code production: **0 file changed** trong lượt closeout tài
+  liệu này. Methodology: **0 file changed**.
+
+**Open gates** — KHÔNG tự ý giải; chờ owner / mentor:
+
+- **DBSCAN parameter tuning** (D-DEV04-ML04-01): trên dữ liệu thật với
+  config `WORKING_ASSUMPTION` hiện tại cho 100% noise. Methodology gate.
+- **MKT-01..MKT-05 framework**: researcher tạo, owner / mentor duyệt.
+  Hiện `ABSENT`.
+- **Owner decisions còn PENDING_REVIEW**: OQ-D05, OQ-D07-01/03/04/05,
+  SYS-01 OQ-01/02/03/05. SYS-02 vẫn `DRAFT`.
+- **EPIC-08 / EPIC-09 / EPIC-10**: chưa có final scope approval.
+- **K-01** (missing preprocessed log `pp_ecd1dc6aa1a9069ee85eea53.log`):
+  owner quyết định.
+
+**Implementation artifacts liên quan:**
+
+- Prototype source: `src/customer_segmentation/{prototype,dataset_management}/`.
+- Prototype CLI: `scripts/dev02_import_dataset.py` → `scripts/dev09_run_pipeline.py`.
+- Prototype configs: `configs/dev02_*.yaml` → `configs/dev09_*.yaml`.
+- Prototype tests: `tests/test_dev0*_*.py` (156 file).
+- Implementation logs: `docs/system/DEV-01_*.md` → `docs/system/DEV-10_*.md`.
 
 ---
 

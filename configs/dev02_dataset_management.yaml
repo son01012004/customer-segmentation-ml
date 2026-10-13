@@ -1,0 +1,14 @@
+dataset_management:
+  default_csv_encoding: utf-8
+  max_file_size_mb: 256
+  readonly_research_paths:
+  - data/raw/primary
+  - data/raw/backup
+  - data/processed
+  - reports
+  source_path_policy:
+    allow_external_source: false
+  storage_root: data/prototype/datasets
+  supported_import_formats:
+  - csv
+  - parquet

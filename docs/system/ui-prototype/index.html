@@ -1,0 +1,1622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Customer Segmentation ML — Prototype</title>
+<meta name="description" content="Research-oriented customer segmentation prototype. SYS-06 interactive UI/UX prototype." />
+<link rel="preconnect" href="https://rsms.me/" />
+<link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+<style>
+/* ============================================================
+   1. Design tokens
+   ============================================================ */
+:root{
+  --color-bg:#fafaf9;          --color-surface:#ffffff;       --color-surface-2:#f5f5f4;
+  --color-border:#e7e5e4;      --color-border-strong:#d6d3d1;
+  --color-text:#1c1917;        --color-text-muted:#57534e;    --color-text-subtle:#78716c;
+  --color-text-disabled:#a3a3a3;
+  --color-accent:#0f766e;      --color-accent-hover:#115e59;  --color-accent-soft:#ccfbf1;
+  --color-success:#15803d;     --color-warning:#b45309;       --color-error:#b91c1c;
+  --color-info:#1d4ed8;
+  --font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  --radius:6px; --radius-lg:8px;
+  --shadow-overlay:0 1px 2px rgba(0,0,0,0.05),0 4px 12px rgba(0,0,0,0.08);
+  --sidebar-w:240px;  --sidebar-w-collapsed:64px;
+  --topbar-h:56px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--color-bg);color:var(--color-text);
+  font-family:var(--font-sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;font-size:inherit;cursor:pointer}
+a{color:var(--color-accent);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3,h4{margin:0;font-weight:600;color:var(--color-text);letter-spacing:-0.01em}
+h1{font-size:20px;line-height:1.3;font-weight:700}
+h2{font-size:18px;line-height:1.3}
+h3{font-size:15px;line-height:1.4}
+h4{font-size:13px;line-height:1.4;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.04em;font-weight:600}
+p{margin:0 0 8px}
+code,pre,.mono{font-family:var(--font-mono);font-size:12px}
+hr{border:none;border-top:1px solid var(--color-border);margin:16px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;font-weight:600;color:var(--color-text-muted);
+  background:var(--color-surface-2);border-bottom:1px solid var(--color-border);font-size:12px;text-transform:uppercase;letter-spacing:0.04em}
+td{padding:12px;border-bottom:1px solid var(--color-border);vertical-align:middle}
+tbody tr:hover{background:var(--color-surface-2)}
+tbody tr:last-child td{border-bottom:none}
+
+/* ============================================================
+   2. App shell
+   ============================================================ */
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100vh}
+.sidebar{background:var(--color-surface);border-right:1px solid var(--color-border);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.sidebar-brand{padding:18px 20px;border-bottom:1px solid var(--color-border);
+  display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
+.sidebar-brand .logo{width:28px;height:28px;border-radius:6px;background:var(--color-accent);
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;letter-spacing:-0.04em}
+.sidebar-nav{padding:12px 8px;flex:1}
+.nav-section{margin-bottom:16px}
+.nav-section-title{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;
+  color:var(--color-text-subtle);padding:8px 12px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;
+  color:var(--color-text-muted);cursor:pointer;user-select:none;font-size:13.5px;
+  margin-bottom:2px;transition:background 120ms,color 120ms}
+.nav-item:hover{background:var(--color-surface-2);color:var(--color-text)}
+.nav-item.active{background:var(--color-accent-soft);color:var(--color-accent);font-weight:500}
+.nav-item.active::before{content:"";display:block;width:2px;height:18px;background:var(--color-accent);
+  border-radius:2px;position:absolute;left:0;height:24px;margin-top:-7px}
+.nav-item .icon{width:18px;height:18px;flex-shrink:0}
+.sidebar-footer{padding:12px;border-top:1px solid var(--color-border);font-size:11px;color:var(--color-text-subtle)}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{height:var(--topbar-h);background:var(--color-surface);border-bottom:1px solid var(--color-border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:10}
+.breadcrumb{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-text-muted)}
+.breadcrumb a{color:var(--color-text-muted)}
+.breadcrumb .sep{color:var(--color-text-disabled)}
+.breadcrumb .current{color:var(--color-text);font-weight:500}
+.topbar-right{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--color-text-muted)}
+.environment-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;
+  background:var(--color-surface-2);font-family:var(--font-mono);font-size:11px}
+.user-avatar{width:28px;height:28px;border-radius:50%;background:var(--color-surface-2);
+  border:1px solid var(--color-border);display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;color:var(--color-text-muted)}
+.content{padding:24px;max-width:1280px;width:100%;margin:0 auto}
+.mock-banner{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;
+  padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:16px;
+  display:flex;align-items:center;gap:8px}
+.mock-banner strong{font-weight:600}
+
+/* ============================================================
+   3. Components
+   ============================================================ */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:0 12px;height:36px;border-radius:6px;
+  border:1px solid transparent;font-size:13px;font-weight:500;white-space:nowrap;
+  transition:background 120ms,border-color 120ms,color 120ms,box-shadow 120ms}
+.btn-sm{height:28px;padding:0 10px;font-size:12px}
+.btn-lg{height:44px;padding:0 16px;font-size:14px}
+.btn-primary{background:var(--color-accent);color:#fff}
+.btn-primary:hover{background:var(--color-accent-hover)}
+.btn-secondary{background:var(--color-surface);color:var(--color-text);border-color:var(--color-border-strong)}
+.btn-secondary:hover{background:var(--color-surface-2)}
+.btn-ghost{background:transparent;color:var(--color-accent);padding:0 6px;height:auto}
+.btn-ghost:hover{text-decoration:underline}
+.btn-danger{background:var(--color-error);color:#fff}
+.btn-danger:hover{filter:brightness(0.95)}
+.btn:disabled,.btn[aria-disabled="true"]{background:var(--color-surface-2);color:var(--color-text-disabled);
+  border-color:var(--color-border);cursor:not-allowed}
+.btn .icon{width:16px;height:16px}
+
+.input,.select{height:36px;padding:0 12px;border:1px solid var(--color-border-strong);border-radius:6px;
+  background:var(--color-surface);font-size:13px;color:var(--color-text);font-family:inherit;width:100%}
+.input:focus,.select:focus{outline:2px solid var(--color-accent);outline-offset:1px;border-color:var(--color-accent)}
+.input-sm{height:28px;font-size:12px;padding:0 8px}
+label{display:block;font-size:12px;font-weight:500;color:var(--color-text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em}
+.field{margin-bottom:14px}
+.help{font-size:12px;color:var(--color-text-subtle);margin-top:4px}
+.help.error{color:var(--color-error)}
+.help.warn{color:var(--color-warning)}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;
+  font-size:11px;font-weight:500;line-height:1.6;white-space:nowrap}
+.badge .icon{width:12px;height:12px}
+.badge-working-assumption{background:#fef3c7;color:#78350f}
+.badge-future-work{background:#e0e7ff;color:#312e81}
+.badge-review-required{background:#fee2e2;color:#7f1d1d}
+.badge-contract-required{background:#d1fae5;color:#064e3b}
+.badge-baseline{background:#dbeafe;color:#1e3a8a}
+.badge-diagnostic{background:var(--color-surface-2);color:#44403c}
+.badge-noise{background:var(--color-surface-2);color:#44403c;border:1px dashed var(--color-border-strong)}
+.badge-not-available{background:var(--color-surface-2);color:#44403c}
+.badge-success{background:#dcfce7;color:#14532d}
+.badge-running{background:#dbeafe;color:#1e3a8a}
+.badge-pending{background:var(--color-surface-2);color:#44403c}
+.badge-failed{background:#fee2e2;color:#7f1d1d}
+.badge-cancelled{background:var(--color-surface-2);color:#44403c}
+.badge-naming-pending{background:#fef3c7;color:#78350f}
+
+.card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:20px}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.card-title{font-size:15px;font-weight:600}
+.card-subtitle{font-size:12px;color:var(--color-text-muted);margin-top:2px}
+
+.divider{height:1px;background:var(--color-border);margin:16px 0}
+
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--color-border);margin-bottom:16px;overflow-x:auto}
+.tab{padding:10px 14px;font-size:13px;color:var(--color-text-muted);cursor:pointer;border-bottom:2px solid transparent;
+  white-space:nowrap;margin-bottom:-1px;background:transparent;border-left:none;border-right:none;border-top:none;
+  font-family:inherit}
+.tab:hover{color:var(--color-text)}
+.tab.active{color:var(--color-accent);font-weight:600;border-bottom-color:var(--color-accent)}
+
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:16px}
+.metric{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius);padding:14px}
+.metric-label{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--color-text-muted);margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.metric-unit{font-size:12px;color:var(--color-text-muted);margin-left:2px}
+
+.empty{text-align:center;padding:48px 24px;background:var(--color-surface);border:1px dashed var(--color-border-strong);
+  border-radius:var(--radius-lg)}
+.empty .icon{width:32px;height:32px;color:var(--color-text-subtle);margin:0 auto 12px;display:block}
+.empty-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.empty-body{font-size:13px;color:var(--color-text-muted);max-width:380px;margin:0 auto 16px}
+
+.error-box{background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d;padding:12px 14px;
+  border-radius:6px;font-size:13px;display:flex;align-items:flex-start;gap:10px}
+.error-box .icon{flex-shrink:0;width:18px;height:18px;margin-top:1px}
+.error-box code{background:#fde2e2;padding:1px 4px;border-radius:3px;font-size:11px}
+
+.skeleton{background:linear-gradient(90deg,var(--color-surface-2) 0%,#ebe9e6 50%,var(--color-surface-2) 100%);
+  background-size:200% 100%;animation:skel 1.4s ease-in-out infinite;border-radius:4px}
+@keyframes skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-line{height:14px;margin-bottom:8px}
+.skel-block{height:80px;width:100%}
+.skel-circle{width:28px;height:28px;border-radius:50%}
+
+.spinner-inline{display:inline-block;width:12px;height:12px;border:2px solid var(--color-border-strong);
+  border-top-color:var(--color-text);border-radius:50%;animation:spin 600ms linear infinite;
+  vertical-align:-2px;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.kv-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px dashed var(--color-border)}
+.kv-row dt{color:var(--color-text-muted);font-weight:500;font-size:12px;min-width:200px}
+.kv-row dd{margin:0;font-family:var(--font-mono);font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kv-row:last-child{border-bottom:none}
+
+.toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:1000}
+.toast{background:var(--color-text);color:#fafaf9;padding:10px 14px;border-radius:6px;
+  font-size:13px;box-shadow:var(--shadow-overlay);min-width:240px;max-width:360px;
+  display:flex;align-items:center;gap:10px;animation:toastIn 200ms cubic-bezier(0.2,0,0,1)}
+.toast.success{background:var(--color-success)}
+.toast.error{background:var(--color-error)}
+.toast.info{background:var(--color-info)}
+.toast .icon{width:16px;height:16px;flex-shrink:0}
+@keyframes toastIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.modal-backdrop{position:fixed;inset:0;background:rgba(28,25,23,0.5);display:flex;align-items:center;justify-content:center;z-index:900;animation:fadeIn 150ms}
+.modal{background:var(--color-surface);border-radius:var(--radius-lg);padding:24px;max-width:480px;width:100%;
+  box-shadow:var(--shadow-overlay);animation:modalIn 200ms cubic-bezier(0.2,0,0,1)}
+.modal-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.modal-title{font-size:16px;font-weight:600}
+.modal-body{font-size:13px;color:var(--color-text-muted);margin-bottom:16px;line-height:1.6}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes modalIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+.wizard-steps{display:flex;align-items:center;gap:0;margin-bottom:24px;padding:0;list-style:none}
+.wizard-step{display:flex;align-items:center;gap:8px;flex:1;position:relative}
+.wizard-step:not(:last-child)::after{content:"";flex:1;height:1px;background:var(--color-border);margin:0 8px}
+.wizard-step.complete:not(:last-child)::after{background:var(--color-accent)}
+.wizard-step .num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--color-surface-2);color:var(--color-text-muted);font-size:12px;font-weight:600;flex-shrink:0}
+.wizard-step.active .num{background:var(--color-accent);color:#fff}
+.wizard-step.complete .num{background:var(--color-accent);color:#fff}
+.wizard-step .label{font-size:12px;color:var(--color-text-muted);font-weight:500}
+.wizard-step.active .label{color:var(--color-text);font-weight:600}
+
+.algo-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.algo-card{padding:16px;border:1px solid var(--color-border);border-radius:var(--radius);cursor:pointer;background:var(--color-surface);transition:border-color 120ms,background 120ms}
+.algo-card:hover{border-color:var(--color-border-strong);background:var(--color-surface-2)}
+.algo-card.selected{border-color:var(--color-accent);background:#f0fdfa}
+.algo-card .name{font-size:14px;font-weight:600;margin-bottom:4px}
+.algo-card .family{font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--color-text-muted);margin-bottom:6px}
+.algo-card .desc{font-size:12px;color:var(--color-text-muted);line-height:1.5}
+
+.config-row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;
+  background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius)}
+.config-row .label{font-size:12px;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:0.04em}
+.config-row .value{font-family:var(--font-mono);font-size:12px}
+
+.progress-track{height:6px;background:var(--color-surface-2);border-radius:3px;overflow:hidden;margin:8px 0}
+.progress-bar{height:100%;background:var(--color-accent);transition:width 200ms}
+.log-box{background:#0c0a09;color:#e7e5e4;padding:12px;border-radius:6px;font-family:var(--font-mono);font-size:12px;
+  max-height:200px;overflow-y:auto;line-height:1.6;white-space:pre-wrap}
+.log-line{display:block}
+.log-line .ts{color:#78716c;margin-right:8px}
+
+.kv{display:grid;grid-template-columns:160px 1fr;gap:8px 16px;font-size:13px}
+.kv dt{color:var(--color-text-muted);font-weight:500}
+.kv dd{margin:0;font-family:var(--font-mono);font-size:12px}
+
+.diag-only{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--color-text-muted)}
+
+.bar-chart{display:flex;align-items:flex-end;gap:6px;height:160px;padding:8px 0;border-bottom:1px solid var(--color-border);position:relative}
+.bar{flex:1;background:var(--color-accent);border-radius:2px 2px 0 0;position:relative;min-width:24px;transition:height 200ms}
+.bar.noise{background:repeating-linear-gradient(45deg,var(--color-surface-2) 0,var(--color-surface-2) 4px,#d6d3d1 4px,#d6d3d1 8px);border:1px dashed var(--color-border-strong)}
+.bar .val{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:11px;font-weight:500;color:var(--color-text-muted);font-variant-numeric:tabular-nums}
+.bar-labels{display:flex;gap:6px;font-size:11px;color:var(--color-text-muted);margin-top:6px}
+.bar-labels span{flex:1;text-align:center;min-width:24px}
+
+.compare-table th:first-child,.compare-table td:first-child{position:sticky;left:0;background:var(--color-surface);z-index:1;font-weight:500}
+.compare-table th:first-child{background:var(--color-surface-2)}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:0.01ms !important;animation-iteration-count:1 !important;transition-duration:0.01ms !important}
+  .skeleton{background:var(--color-surface-2);animation:none}
+}
+
+@media (max-width:1023px){
+  .app{grid-template-columns:var(--sidebar-w-collapsed) 1fr}
+  .nav-item .label,.nav-section-title,.sidebar-brand .label,.sidebar-footer .label{display:none}
+  .nav-item{justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============= Sidebar ============= -->
+  <aside class="sidebar" aria-label="Primary navigation">
+    <div class="sidebar-brand">
+      <div class="logo">CS</div>
+      <div class="label">Customer Segmentation<br/><span style="font-weight:400;font-size:11px;color:var(--color-text-muted)">Research Prototype</span></div>
+    </div>
+    <nav class="sidebar-nav" id="nav">
+      <div class="nav-section">
+        <div class="nav-section-title"><span class="label">Overview</span></div>
+        <div class="nav-item" data-route="#/dashboard"><i data-lucide="layout-dashboard" class="icon"></i><span class="label">Dashboard</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title"><span class="label">Data</span></div>
+        <div class="nav-item" data-route="#/datasets"><i data-lucide="database" class="icon"></i><span class="label">Datasets</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title"><span class="label">Research</span></div>
+        <div class="nav-item" data-route="#/experiments"><i data-lucide="flask-conical" class="icon"></i><span class="label">Experiments</span></div>
+        <div class="nav-item" data-route="#/evaluation"><i data-lucide="bar-chart-3" class="icon"></i><span class="label">Evaluation</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title"><span class="label">Segments</span></div>
+        <div class="nav-item" data-route="#/profiling"><i data-lucide="users" class="icon"></i><span class="label">Profiling</span></div>
+        <div class="nav-item" data-route="#/marketing"><i data-lucide="megaphone" class="icon"></i><span class="label">Marketing</span></div>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title"><span class="label">Reports</span></div>
+        <div class="nav-item" data-route="#/reports"><i data-lucide="file-text" class="icon"></i><span class="label">Reports</span></div>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="label">SYS-06 Prototype v0.2<br/>Methodology Lock: 2026-09-22</div>
+    </div>
+  </aside>
+
+  <!-- ============= Main ============= -->
+  <div class="main">
+    <div class="topbar">
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="topbar-right">
+        <span class="environment-pill">
+          <i data-lucide="git-branch" style="width:12px;height:12px"></i> feat/sys-06
+        </span>
+        <span class="environment-pill">Python 3.11</span>
+        <div class="user-avatar" title="Researcher (single-user prototype)">R</div>
+      </div>
+    </div>
+    <div class="content" id="content" role="main"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Lucide icons init
+   ============================================================ */
+function initIcons(){if(window.lucide) window.lucide.createIcons()}
+
+/* ============================================================
+   Toast helper
+   ============================================================ */
+function toast(message, variant="info", duration=3500){
+  const el=document.createElement("div");
+  el.className=`toast ${variant}`;
+  const icon=variant==="success"?"circle-check":variant==="error"?"circle-x":"info";
+  el.innerHTML=`<i data-lucide="${icon}" class="icon"></i><span>${message}</span>`;
+  document.getElementById("toasts").appendChild(el);
+  initIcons();
+  setTimeout(()=>{el.style.opacity="0";el.style.transition="opacity 200ms";setTimeout(()=>el.remove(),200)},duration);
+}
+
+/* ============================================================
+   Modal helper
+   ============================================================ */
+function confirmDialog({title,body,confirmText="Confirm",cancelText="Cancel",variant="primary"}){
+  return new Promise(resolve=>{
+    const back=document.createElement("div");
+    back.className="modal-backdrop";
+    const btnVariant=variant==="danger"?"btn-danger":"btn-primary";
+    back.innerHTML=`
+      <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <div class="modal-title">${title}</div>
+          <button class="btn btn-ghost" data-act="cancel" aria-label="Close"><i data-lucide="x" class="icon"></i></button>
+        </div>
+        <div class="modal-body">${body}</div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-act="cancel">${cancelText}</button>
+          <button class="btn ${btnVariant}" data-act="confirm">${confirmText}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(back);initIcons();
+    function close(v){back.remove();resolve(v)}
+    back.addEventListener("click",e=>{if(e.target===back) close(false)});
+    back.querySelector('[data-act="cancel"]').addEventListener("click",()=>close(false));
+    back.querySelector('[data-act="confirm"]').addEventListener("click",()=>close(true));
+  });
+}
+
+/* ============================================================
+   Mock data (Prototype mock data)
+   ============================================================ */
+const MOCK = {
+  dataset: {
+    id:"ds_fe06_v1_0",
+    name:"Online Retail",
+    version:"FE06-v1.0",
+    kind:"primary",
+    status:"VALID",
+    rows:4371, features:14,
+    size_bytes: 528340,
+    sha256:"ba54033e45525bf5123c2d9d3684b110676a84e81d4d505bb781a3be10980f9c",
+    raw_sha256:"43465a06f2ccf7c8b5bd2892bc7defb52f97487934fe93b16ae4c3936424676d",
+    source_url:"https://archive.ics.uci.edu/dataset/352/online+retail",
+    license:"CC BY 4.0",
+    source_doi:"10.1057/dbm.2012.17",
+    created_at:"2026-09-18T10:00:00Z",
+    adr:"ADR-0001 / FE-06",
+    validation_status:"VALID" // per SYS-06 §S-02: NOT_VALIDATED | VALID | VALIDATING | FAILED
+  },
+  // Synthetic dataset rows for S-02 Validate-button state-machine demo.
+  // Prototype UI State Data (Tier B per SYS-06 §18.4): synthetic, must NOT
+  // be cited as research evidence. Each row exercises one validation_status.
+  datasets:[
+    {id:"ds_fe06_v1_0", name:"Online Retail", version:"FE06-v1.0", kind:"primary", rows:4371,
+      sha256:"ba54033e45525bf5123c2d9d3684b110676a84e81d4d505bb781a3be10980f9c",
+      validation_status:"VALID", created_at:"2026-09-18"},
+    {id:"ds_fe05_v0_9", name:"Online Retail (FE-05 candidate)", version:"FE05-v0.9", kind:"candidate", rows:4371,
+      sha256:"a1b2c3d4e5f60718293a4b5c6d7e8f900112233445566778899aabbccddeeff0",
+      validation_status:"NOT_VALIDATED", created_at:"2026-09-30"},
+    {id:"ds_backup_2025q4", name:"Online Retail backup (2025-Q4)", version:"2025Q4-bk", kind:"backup", rows:4256,
+      sha256:"99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa",
+      validation_status:"VALIDATING", created_at:"2026-10-05"},
+    {id:"ds_experimental_a", name:"Experimental subset A", version:"exp-A-v0.2", kind:"experimental", rows:500,
+      sha256:"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      validation_status:"FAILED", validation_error:"Row 1,243: InvoiceNo missing C prefix; row 891: Quantity negative", created_at:"2026-10-04"}
+  ],
+  features: [
+    {name:"Recency",status:"ELIGIBLE",desc:"Days since last purchase"},
+    {name:"Frequency",status:"ELIGIBLE_WORKING_ASSUMPTION",desc:"Total number of invoices"},
+    {name:"Monetary",status:"ELIGIBLE",desc:"Total spend"},
+    {name:"TotalQuantity",status:"ELIGIBLE",desc:"Sum of quantities across invoices"},
+    {name:"AverageQuantity",status:"ELIGIBLE_WORKING_ASSUMPTION",desc:"Mean quantity per invoice"},
+    {name:"BasketSize",status:"ELIGIBLE_WORKING_ASSUMPTION",desc:"Avg line items per invoice"},
+    {name:"TenureDays",status:"ELIGIBLE",desc:"Days between first and last purchase"},
+    {name:"PurchaseIntervalMean",status:"ELIGIBLE",desc:"Mean inter-purchase interval"},
+    {name:"PurchaseIntervalStd",status:"ELIGIBLE",desc:"Std of inter-purchase intervals"},
+    {name:"ActiveDays",status:"ELIGIBLE_WORKING_ASSUMPTION",desc:"Distinct days with a purchase"},
+    {name:"AverageInvoiceValue",status:"ELIGIBLE",desc:"Mean monetary per invoice"},
+    {name:"ProductsPerInvoice",status:"ELIGIBLE",desc:"Unique products per invoice"},
+    {name:"CancellationRate",status:"ELIGIBLE_WORKING_ASSUMPTION",desc:"Cancelled lines / total lines"},
+    {name:"ReturnRate",status:"ELIGIBLE_WORKING_ASSUMPTION",desc:"Returned lines / total lines"}
+  ],
+  algorithms:[
+    {id:"kmeans",name:"K-Means",family:"hard centroid-based",desc:"Hard assignment by nearest centroid; baseline algorithm; supports WCSS diagnostic."},
+    {id:"agglomerative",name:"Agglomerative",family:"hierarchical",desc:"Ward-linkage hierarchical clustering; deterministic, no random seed."},
+    {id:"dbscan",name:"DBSCAN",family:"density-based",desc:"Density-based; noise points labelled −1; silhouette computed on non-noise subset."},
+    {id:"gmm",name:"Gaussian Mixture",family:"model-based",desc:"Probabilistic; soft responsibilities; supports WCSS, BIC, AIC."},
+    {id:"fcm",name:"Fuzzy C-Means",family:"fuzzy",desc:"Soft membership values; Bezdek update; supports WCSS, FPC, partition entropy."}
+  ],
+  configs: [
+    // config-only source of truth (per SYS-05 D.1): K and random_seed are
+    // immutable knobs declared by the configuration snapshot. The UI MUST NOT
+    // expose input fields for these in default flow. Override from UI = REVIEW_REQUIRED.
+    {id:"clustering_kmeans_default", version:"v1", algo:"kmeans", k_value:4, k_applicable:true, random_seed:42},
+    {id:"clustering_agglomerative_default", version:"v1", algo:"agglomerative", k_value:4, k_applicable:true, random_seed:null, random_seed_note:"Deterministic (Ward linkage); no random seed."},
+    {id:"clustering_dbscan_default", version:"v1", algo:"dbscan", k_value:null, k_applicable:false, random_seed:null, k_note:"n_clusters_realized from density; no K input."},
+    {id:"clustering_gmm_default", version:"v1", algo:"gmm", k_value:4, k_applicable:true, k_alias:"n_components", random_seed:42},
+    {id:"clustering_fcm_default", version:"v1", algo:"fcm", k_value:4, k_applicable:true, k_alias:"c", random_seed:42}
+  ],
+  experiments:[
+    // Canonical status enum per SYS-05 G.3: PENDING / RUNNING / SUCCEEDED / FAILED / CANCELLED / TIMEOUT.
+    // UI display label mapping: SUCCEEDED → "Completed" (single source of truth in §10.4 / statusBadge).
+    {id:"run_e_0001",algo:"kmeans",k:4,status:"SUCCEEDED",created_at:"2026-10-01T09:14:00Z",duration_s:2.31,seed:42},
+    {id:"run_e_0002",algo:"kmeans",k:3,status:"SUCCEEDED",created_at:"2026-10-01T09:21:00Z",duration_s:1.94,seed:42},
+    {id:"run_e_0003",algo:"agglomerative",k:4,status:"SUCCEEDED",created_at:"2026-10-01T10:02:00Z",duration_s:8.10,seed:42},
+    {id:"run_e_0004",algo:"dbscan",k:null,status:"SUCCEEDED",created_at:"2026-10-01T10:15:00Z",duration_s:6.21,seed:42,realized_k:2,noise_pct:0.7268},
+    {id:"run_e_0005",algo:"gmm",k:4,status:"SUCCEEDED",created_at:"2026-10-01T10:30:00Z",duration_s:3.42,seed:42},
+    {id:"run_e_0006",algo:"fcm",k:4,status:"SUCCEEDED",created_at:"2026-10-01T10:42:00Z",duration_s:11.50,seed:42},
+    {id:"run_e_0007",algo:"kmeans",k:5,status:"RUNNING",created_at:"2026-10-07T11:00:00Z",duration_s:null,seed:42},
+    {id:"run_e_0008",algo:"agglomerative",k:3,status:"FAILED",created_at:"2026-10-07T11:05:00Z",duration_s:null,seed:42,error:"Singular matrix in linkage computation (see logs)"}
+  ],
+  // Mock metric numbers (placeholder; do not represent final results)
+  metrics: {
+    e1:{silhouette:0.4123,dbi:1.21,ch:1234.5,wcss:1100.2,runtime:2.31,stability:"NOT_REQUESTED"},
+    e2:{silhouette:0.3987,dbi:1.34,ch:1110.2,wcss:1240.5,runtime:1.94,stability:"NOT_REQUESTED"},
+    e3:{silhouette:0.4001,dbi:1.29,ch:1145.7,wcss:null,runtime:8.10,stability:"NOT_REQUESTED"},
+    e4:{silhouette:0.0501,dbi:2.10,ch:201.4,wcss:null,runtime:6.21,stability:"NOT_REQUESTED",noise_pct:0.7268,realized_k:2},
+    e5:{silhouette:0.4051,dbi:1.25,ch:1189.4,wcss:null,runtime:3.42,stability:"NOT_REQUESTED"},
+    e6:{silhouette:0.3980,dbi:1.31,ch:1148.2,wcss:null,runtime:11.50,stability:"NOT_REQUESTED"}
+  },
+  clusterDist:{
+    e1:{0:{n:1100},1:{n:1300},2:{n:980},3:{n:991}},
+    e4:{0:{n:996},1:{n:199},"-1":{n:3176}}
+  },
+  // Profiling mock — per `SYS-01` FR-SEG-04: status taxonomy, no business name
+  segments:{
+    e1:[
+      {id:0,size:1100,share:0.252,status:"NAMING_PENDING",business_label:"Not assigned"},
+      {id:1,size:1300,share:0.297,status:"NAMING_PENDING",business_label:"Not assigned"},
+      {id:2,size:980,share:0.224,status:"NAMING_PENDING",business_label:"Not assigned"},
+      {id:3,size:991,share:0.227,status:"NAMING_PENDING",business_label:"Not assigned"}
+    ],
+    e4:[
+      {id:0,size:996,share:0.228,status:"NAMING_PENDING",business_label:"Not assigned"},
+      {id:1,size:199,share:0.046,status:"NAMING_PENDING",business_label:"Not assigned"},
+      {id:"-1",size:3176,share:0.726,status:"NOISE",business_label:"Not a customer segment"}
+    ]
+  }
+};
+
+/* ============================================================
+   Skeleton helpers
+   ============================================================ */
+function skel(n=3,w=100,h=14){return Array.from({length:n},()=>`<div class="skeleton skel-line" style="width:${w}%;height:${h}px;margin-bottom:6px"></div>`).join("")}
+function skelBlock(h=80){return `<div class="skeleton skel-block" style="height:${h}px"></div>`}
+
+/* ============================================================
+   Router
+   ============================================================ */
+const routes=[
+  {hash:"#/dashboard",          title:"Dashboard",                       render:renderDashboard,     crumb:[["#/dashboard","Dashboard"]]},
+  {hash:"#/datasets",            title:"Datasets",                         render:renderDatasetsList,  crumb:[["#/datasets","Datasets"]]},
+  {hash:"#/datasets/ds_fe06_v1_0",title:"Datasets › Online Retail",        render:renderDatasetDetail, crumb:[["#/datasets","Datasets"],["#/datasets/ds_fe06_v1_0","Online Retail"]]},
+  {hash:"#/experiments",         title:"Experiments",                      render:renderExperimentsList,crumb:[["#/experiments","Experiments"]]},
+  {hash:"#/experiments/new",     title:"Experiments › New experiment",     render:renderWizard,        crumb:[["#/experiments","Experiments"],["#/experiments/new","New"]]},
+  {hash:"#/experiments/run_e_0007",title:"Experiments › Running",          render:renderRunning,       crumb:[["#/experiments","Experiments"],["#/experiments/run_e_0007","run_e_0007"]]},
+  {hash:"#/experiments/run_e_0001",title:"Experiments › Result",            render:renderResult,        crumb:[["#/experiments","Experiments"],["#/experiments/run_e_0001","run_e_0001"]]},
+  {hash:"#/evaluation",          title:"Evaluation",                       render:renderEvaluation,    crumb:[["#/evaluation","Evaluation"]]},
+  {hash:"#/profiling",           title:"Profiling",                        render:renderProfiling,     crumb:[["#/profiling","Profiling"]]},
+  {hash:"#/profiling/run_e_0001/kmeans/0",title:"Profiling › Segment 0",   render:renderSegmentDetail, crumb:[["#/profiling","Profiling"],["#/profiling/run_e_0001/kmeans/0","run_e_0001 / K-Means / Segment 0"]]},
+  {hash:"#/reports",             title:"Reports",                          render:renderReportsList,   crumb:[["#/reports","Reports"]]},
+  {hash:"#/reports/r_0001",      title:"Reports › Phase 7 summary",        render:renderReportDetail,  crumb:[["#/reports","Reports"],["#/reports/r_0001","Phase 7 summary"]]},
+  {hash:"#/marketing",           title:"Marketing",                        render:renderMarketing,     crumb:[["#/marketing","Marketing"]]}
+];
+
+function parseRoute(){
+  const h=location.hash||"#/dashboard";
+  return routes.find(r=>r.hash===h) || routes[0];
+}
+
+function navigate(hash){
+  if(location.hash!==hash){location.hash=hash;return}
+  render();
+}
+
+function setActiveNav(){
+  const h=location.hash||"#/dashboard";
+  document.querySelectorAll(".nav-item").forEach(el=>{
+    el.classList.toggle("active", el.dataset.route===h || (h.startsWith(el.dataset.route)&&el.dataset.route!=="#/dashboard"));
+  });
+}
+
+function render(){
+  const r=parseRoute();
+  document.title=r.title+" — Customer Segmentation ML";
+  // Breadcrumb
+  const bc=document.getElementById("breadcrumb");
+  bc.innerHTML=r.crumb.map((c,i)=>{
+    const isLast=i===r.crumb.length-1;
+    return isLast?`<span class="current">${c[1]}</span>`:`<a href="${c[0]}">${c[1]}</a><span class="sep">›</span>`;
+  }).join("");
+  // Content
+  const c=document.getElementById("content");
+  c.innerHTML="";
+  c.innerHTML=skel(4,90,16);
+  setTimeout(()=>{
+    c.innerHTML="";
+    c.appendChild(r.render());
+    setActiveNav();initIcons();
+  },180);
+}
+window.addEventListener("hashchange",render);
+document.querySelectorAll(".nav-item").forEach(el=>el.addEventListener("click",()=>navigate(el.dataset.route)));
+
+/* ============================================================
+   Mock banner
+   ============================================================ */
+function mockBanner(){return `<div class="mock-banner"><i data-lucide="info" style="width:14px;height:14px"></i><span><strong>Prototype mock data.</strong> Numbers and IDs shown here are placeholders for UI review; do not cite as research evidence.</span></div>`}
+
+/* ============================================================
+   Status badge
+   ============================================================ */
+function statusBadge(status){
+  const map={
+    "WORKING_ASSUMPTION":`<span class="badge badge-working-assumption"><i data-lucide="alert-circle" class="icon"></i>Working assumption</span>`,
+    "FUTURE_WORK":`<span class="badge badge-future-work"><i data-lucide="clock" class="icon"></i>Future work</span>`,
+    "REVIEW_REQUIRED":`<span class="badge badge-review-required"><i data-lucide="alert-triangle" class="icon"></i>Review required</span>`,
+    "CONTRACT_REQUIRED":`<span class="badge badge-contract-required"><i data-lucide="check-circle-2" class="icon"></i>Contract required</span>`,
+    "BASELINE":`<span class="badge badge-baseline"><i data-lucide="bookmark" class="icon"></i>Current working baseline</span>`,
+    "DIAGNOSTIC_ONLY":`<span class="badge badge-diagnostic"><i data-lucide="activity" class="icon"></i>Diagnostic only</span>`,
+    "NOISE":`<span class="badge badge-noise"><i data-lucide="ban" class="icon"></i>Noise (−1)</span>`,
+    "NOT_AVAILABLE":`<span class="badge badge-not-available"><i data-lucide="minus-circle" class="icon"></i>Not available</span>`,
+    "NOT_REQUESTED":`<span class="badge badge-not-available"><i data-lucide="minus-circle" class="icon"></i>Not requested</span>`,
+    "SUCCEEDED":`<span class="badge badge-success"><i data-lucide="circle-check" class="icon"></i>Completed</span>`,
+    "RUNNING":`<span class="badge badge-running"><i data-lucide="circle-dot" class="icon"></i>Running</span>`,
+    "PENDING":`<span class="badge badge-pending"><i data-lucide="circle-dashed" class="icon"></i>Queued</span>`,
+    "QUEUED":`<span class="badge badge-pending"><i data-lucide="circle-dashed" class="icon"></i>Queued</span>`,
+    "FAILED":`<span class="badge badge-failed"><i data-lucide="circle-x" class="icon"></i>Failed</span>`,
+    "CANCELLED":`<span class="badge badge-cancelled"><i data-lucide="ban" class="icon"></i>Cancelled</span>`,
+    "NAMING_PENDING":`<span class="badge badge-naming-pending"><i data-lucide="help-circle" class="icon"></i>Naming pending</span>`,
+    "TIMEOUT":`<span class="badge badge-failed"><i data-lucide="clock-alert" class="icon"></i>Timeout</span>`,
+    "VALID":`<span class="badge badge-success"><i data-lucide="circle-check" class="icon"></i>Valid</span>`,
+    "ELIGIBLE":`<span class="badge badge-contract-required"><i data-lucide="check" class="icon"></i>Eligible</span>`,
+    "ELIGIBLE_WORKING_ASSUMPTION":`<span class="badge badge-working-assumption"><i data-lucide="alert-circle" class="icon"></i>Working assumption</span>`
+  };
+  return map[status]||`<span class="badge badge-pending">${status}</span>`;
+}
+
+/* ============================================================
+   Page: Dashboard
+   ============================================================ */
+function renderDashboard(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <h1 style="margin-bottom:16px">Dashboard</h1>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Active dataset</div>
+          <div class="card-subtitle">RFM Extended 14-feature, FE-06 v1.0 (RESEARCH_WORKING_BASELINE)</div>
+        </div>
+        <a class="btn btn-secondary btn-sm" href="#/datasets/ds_fe06_v1_0">View dataset <i data-lucide="arrow-right" class="icon"></i></a>
+      </div>
+      <div class="metric-row" style="margin-bottom:0">
+        <div class="metric"><div class="metric-label">Customers</div><div class="metric-value">${MOCK.dataset.rows.toLocaleString()}</div></div>
+        <div class="metric"><div class="metric-label">Features</div><div class="metric-value">${MOCK.dataset.features}</div></div>
+        <div class="metric"><div class="metric-label">Preprocessing</div><div class="metric-value" style="font-size:14px">FE-06 C7 ${statusBadge("WORKING_ASSUMPTION")}</div></div>
+        <div class="metric"><div class="metric-label">SHA-256</div><div class="metric-value mono" style="font-size:11px;word-break:break-all">${MOCK.dataset.sha256.slice(0,16)}…</div></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Recent experiments</div>
+          <a class="btn btn-ghost btn-sm" href="#/experiments">View all <i data-lucide="arrow-right" class="icon"></i></a>
+        </div>
+        <table>
+          <thead><tr><th>Run</th><th>Algorithm</th><th>K</th><th>Status</th><th>Started</th></tr></thead>
+          <tbody>
+            ${MOCK.experiments.slice(0,5).map(e=>`
+              <tr>
+                <td><a href="#/experiments/${e.id}"><code>${e.id}</code></a></td>
+                <td>${algoName(e.algo)}</td>
+                <td>${e.k??`<span style="color:var(--color-text-subtle)">realized ${e.realized_k??'—'}</span>`}</td>
+                <td>${statusBadge(e.status)}</td>
+                <td style="font-size:12px;color:var(--color-text-muted)">${e.created_at.replace("T"," ").slice(0,16)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title" style="margin-bottom:12px">System</div>
+        <dl class="kv">
+          <dt>Status</dt><dd>${statusBadge("VALID")}</dd>
+          <dt>Queue</dt><dd>0 jobs</dd>
+          <dt>Storage</dt><dd>FS / parquet</dd>
+          <dt>Config</dt><dd>5 algorithms</dd>
+          <dt>API contract</dt><dd>SYS-05 v1</dd>
+          <dt>Methodology</dt><dd>LOCKED</dd>
+        </dl>
+        <div class="divider"></div>
+        <h4 style="margin-bottom:8px">Quick actions</h4>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <a class="btn btn-primary" href="#/experiments/new"><i data-lucide="plus" class="icon"></i>New experiment</a>
+          <a class="btn btn-secondary" href="#/datasets"><i data-lucide="database" class="icon"></i>Browse datasets</a>
+          <a class="btn btn-secondary" href="#/evaluation"><i data-lucide="bar-chart-3" class="icon"></i>Compare runs</a>
+        </div>
+      </div>
+    </div>
+  `;
+  return el;
+}
+function algoName(id){return (MOCK.algorithms.find(a=>a.id===id)||{}).name||id}
+
+/* ============================================================
+   Page: Datasets List
+   ============================================================ */
+// Per SYS-06 §S-02 Validate-button state machine.
+// Render the appropriate button per validation_status.
+function validateButtonHtml(row){
+  const v=row.validation_status;
+  if(v==="VALID"){
+    return `<button class="btn btn-secondary btn-sm" disabled title="Dataset already VALID"><i data-lucide="circle-check" class="icon"></i>Validated</button>`;
+  }
+  if(v==="VALIDATING"){
+    return `<button class="btn btn-secondary btn-sm" disabled><span class="spinner-inline" aria-hidden="true"></span>Validating…</button>`;
+  }
+  if(v==="FAILED"){
+    return `<button class="btn btn-secondary btn-sm" data-act="validate" data-id="${row.id}" title="Retry validation"><i data-lucide="refresh-cw" class="icon"></i>Retry validation</button>`;
+  }
+  // NOT_VALIDATED (default fallback)
+  return `<button class="btn btn-primary btn-sm" data-act="validate" data-id="${row.id}"><i data-lucide="shield-check" class="icon"></i>Validate</button>`;
+}
+
+function renderDatasetsList(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px">
+      <div>
+        <h1>Datasets</h1>
+        <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">${MOCK.datasets.length} datasets · all read-only in this prototype</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <span class="badge badge-review-required"><i data-lucide="upload" class="icon"></i>Upload: Review required</span>
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--color-border);display:flex;gap:12px">
+        <input class="input input-sm" placeholder="Search by name…" style="max-width:280px"/>
+        <select class="select" style="max-width:180px"><option>All kinds</option><option>primary</option><option>backup</option><option>candidate</option><option>experimental</option></select>
+        <select class="select" style="max-width:200px"><option>All status</option><option>NOT_VALIDATED</option><option>VALID</option><option>VALIDATING</option><option>FAILED</option></select>
+      </div>
+      <table>
+        <thead><tr><th>Name</th><th>Version</th><th>Kind</th><th>Rows</th><th>Validation status</th><th>SHA-256</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${MOCK.datasets.map(row=>{
+            const vBadge = row.validation_status==="VALID" ? statusBadge("VALID")
+                         : row.validation_status==="VALIDATING" ? `<span class="badge badge-pending"><span class="spinner-inline" aria-hidden="true"></span>Validating</span>`
+                         : row.validation_status==="FAILED" ? `<span class="badge badge-failed"><i data-lucide="circle-x" class="icon"></i>Failed</span>`
+                         : `<span class="badge badge-pending"><i data-lucide="circle-dashed" class="icon"></i>Not validated</span>`;
+            const errCell = row.validation_error?`<div style="font-size:11px;color:var(--color-failed,#b91c1c);margin-top:4px">${row.validation_error}</div>`:"";
+            return `
+          <tr>
+            <td><strong>${row.name}</strong><br/><span style="font-size:11px;color:var(--color-text-muted)"><code>${row.id}</code></span></td>
+            <td><code>${row.version}</code></td>
+            <td>${row.kind}</td>
+            <td>${row.rows.toLocaleString()}</td>
+            <td>${vBadge}${errCell}</td>
+            <td><code style="font-size:11px">${row.sha256.slice(0,12)}…</code></td>
+            <td style="text-align:right;display:flex;gap:6px;justify-content:flex-end">
+              <a class="btn btn-secondary btn-sm" href="#/datasets/${row.id}"><i data-lucide="eye" class="icon"></i>View</a>
+              ${validateButtonHtml(row)}
+            </td>
+          </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+      <div style="padding:10px 16px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted);background:var(--color-surface-2)">
+        Validate-button state machine (per SYS-06 §S-02):
+        <code>NOT_VALIDATED</code> → enabled "Validate";
+        <code>VALID</code> → disabled "Validated";
+        <code>VALIDATING</code> → disabled + inline spinner;
+        <code>FAILED</code> → enabled "Retry validation".
+        Click handlers are demo-only; no API call is issued from this prototype.
+      </div>
+    </div>
+  `;
+  setTimeout(()=>{
+    el.querySelectorAll('[data-act="validate"]').forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        toast("Validate action is demo-only in this prototype. Real flow: POST /api/v1/datasets/{id}/validate (per SYS-05 §B.3).","info");
+      });
+    });
+    initIcons();
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Dataset Detail
+   ============================================================ */
+function renderDatasetDetail(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:12px">
+      <h1>${MOCK.dataset.name}</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">
+        <code>${MOCK.dataset.id}</code> · ${MOCK.dataset.kind} · ${statusBadge("VALID")} · created ${MOCK.dataset.created_at.slice(0,10)}
+      </p>
+    </div>
+
+    <nav class="tabs" id="dataset-tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="features">Features (14)</button>
+      <button class="tab" data-tab="provenance">Provenance</button>
+      <button class="tab" data-tab="usage">Usage / Lineage</button>
+    </nav>
+
+    <div id="tab-content"></div>
+  `;
+  setTimeout(()=>{
+    const tabBtns=el.querySelectorAll("#dataset-tabs .tab");
+    const tc=el.querySelector("#tab-content");
+    function show(tab){
+      tabBtns.forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+      if(tab==="overview"){
+        tc.innerHTML=`
+          <div class="card">
+            <h4 style="margin-bottom:12px">Overview</h4>
+            <dl class="kv">
+              <dt>Name</dt><dd>${MOCK.dataset.name}</dd>
+              <dt>Version label</dt><dd>${MOCK.dataset.version}</dd>
+              <dt>Unit of analysis</dt><dd>Customer (4,371 unique)</dd>
+              <dt>Rows</dt><dd>${MOCK.dataset.rows.toLocaleString()}</dd>
+              <dt>Features</dt><dd>${MOCK.dataset.features}</dd>
+              <dt>File size</dt><dd>~${(MOCK.dataset.size_bytes/1024).toFixed(1)} KB (placeholder)</dd>
+              <dt>Feature set</dt><dd>RFM Extended ${statusBadge("BASELINE")}</dd>
+              <dt>Preprocessing</dt><dd>FE-06 C7 ${statusBadge("WORKING_ASSUMPTION")}</dd>
+              <dt>SHA-256</dt><dd>${MOCK.dataset.sha256}</dd>
+            </dl>
+          </div>
+        `;
+      } else if(tab==="features"){
+        tc.innerHTML=`
+          <div class="card" style="padding:0">
+            <table>
+              <thead><tr><th>#</th><th>Feature</th><th>FE-06 status</th><th>Description</th></tr></thead>
+              <tbody>
+                ${MOCK.features.map((f,i)=>`
+                  <tr>
+                    <td style="color:var(--color-text-muted)">${i+1}</td>
+                    <td><strong>${f.name}</strong></td>
+                    <td>${statusBadge(f.status)}</td>
+                    <td style="color:var(--color-text-muted);font-size:12px">${f.desc}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+            <div style="padding:12px 16px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted);background:var(--color-surface-2)">
+              6 of 14 features currently at <span class="badge badge-working-assumption" style="font-size:10px">Working assumption</span> status.
+              Promotion to final-approved requires mentor review (per FE-06 §13).
+            </div>
+          </div>
+        `;
+      } else if(tab==="provenance"){
+        tc.innerHTML=`
+          <div class="card">
+            <h4 style="margin-bottom:12px">Provenance</h4>
+            <dl class="kv">
+              <dt>Source URL</dt><dd><a href="${MOCK.dataset.source_url}" target="_blank" rel="noopener">${MOCK.dataset.source_url}</a></dd>
+              <dt>Article DOI</dt><dd>${MOCK.dataset.source_doi}</dd>
+              <dt>License</dt><dd>${MOCK.dataset.license}</dd>
+              <dt>Raw SHA-256</dt><dd>${MOCK.dataset.raw_sha256}</dd>
+              <dt>Materialized SHA-256</dt><dd>${MOCK.dataset.sha256}</dd>
+              <dt>ADR</dt><dd><a href="../decisions/0001-primary-dataset-uci-online-retail.md">ADR-0001</a> · <a href="../research/EPIC09_CP05_PLAN.md">EPIC-09</a></dd>
+            </dl>
+            <div class="divider"></div>
+            <p style="font-size:12px;color:var(--color-text-muted)">
+              Raw dataset is not committed to this Git repository (per <code>AGENTS.md</code> §2.12 and <code>.gitignore</code>).
+              Researchers must verify SHA-256 locally before re-running any pipeline.
+            </p>
+          </div>
+        `;
+      } else if(tab==="usage"){
+        tc.innerHTML=`
+          <div class="card" style="padding:0">
+            <table>
+              <thead><tr><th>Run</th><th>Stage</th><th>Config</th><th>Ran at</th></tr></thead>
+              <tbody>
+                ${MOCK.experiments.slice(0,6).map(e=>`
+                  <tr>
+                    <td><a href="#/experiments/${e.id}"><code>${e.id}</code></a></td>
+                    <td>clustering</td>
+                    <td><code>clustering_${e.algo}_default v1</code></td>
+                    <td style="font-size:12px;color:var(--color-text-muted)">${e.created_at.replace("T"," ").slice(0,16)}</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+      initIcons();
+    }
+    tabBtns.forEach(b=>b.addEventListener("click",()=>show(b.dataset.tab)));
+    show("overview");
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Experiments List
+   ============================================================ */
+function renderExperimentsList(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px">
+      <div>
+        <h1>Experiments</h1>
+        <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">Clustering runs on FE06-v1.0 (RFM Extended 14 features). 5 algorithms in scope (K-Medoids OUT).</p>
+      </div>
+      <a class="btn btn-primary" href="#/experiments/new"><i data-lucide="plus" class="icon"></i>New experiment</a>
+    </div>
+
+    <div class="card" style="padding:0">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--color-border);display:flex;gap:8px;flex-wrap:wrap">
+        <input class="input input-sm" placeholder="Search run id…" style="max-width:240px"/>
+        <select class="select" style="max-width:180px"><option>All algorithms</option>${MOCK.algorithms.map(a=>`<option>${a.name}</option>`).join("")}</select>
+        <select class="select" style="max-width:180px"><option>All status</option><option>Completed</option><option>Running</option><option>Failed</option></select>
+        <span style="margin-left:auto;font-size:12px;color:var(--color-text-muted);align-self:center">${MOCK.experiments.length} runs</span>
+      </div>
+      <table>
+        <thead><tr><th>Run</th><th>Algorithm</th><th>K</th><th>Status</th><th>Duration</th><th>Seed</th><th>Started</th><th></th></tr></thead>
+        <tbody>
+          ${MOCK.experiments.map(e=>`
+            <tr>
+              <td><a href="#/experiments/${e.id}"><code>${e.id}</code></a></td>
+              <td>${algoName(e.algo)}</td>
+              <td>${e.k??`<span style="color:var(--color-text-subtle)">realized ${e.realized_k??'—'}</span>`}</td>
+              <td>${statusBadge(e.status)}</td>
+              <td>${e.duration_s!=null?e.duration_s.toFixed(2)+' s':e.error?'<span style="color:var(--color-error)">—</span>':'<span style="color:var(--color-text-subtle)">—</span>'}</td>
+              <td><code>${e.seed}</code></td>
+              <td style="font-size:12px;color:var(--color-text-muted)">${e.created_at.replace("T"," ").slice(0,16)}</td>
+              <td style="text-align:right">
+                ${e.status==="RUNNING"?`<a class="btn btn-secondary btn-sm" href="#/experiments/${e.id}">View</a>`:""}
+                ${e.status==="SUCCEEDED"?`<a class="btn btn-secondary btn-sm" href="#/experiments/${e.id}">Open</a>`:""}
+                ${e.status==="FAILED"?`<a class="btn btn-secondary btn-sm" href="#/experiments/${e.id}">Inspect</a>`:""}
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  return el;
+}
+
+/* ============================================================
+   Page: Wizard
+   ============================================================ */
+function renderWizard(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <h1 style="margin-bottom:16px">New experiment</h1>
+    <ol class="wizard-steps" id="wizard-steps">
+      <li class="wizard-step active" data-step="1"><span class="num">1</span><span class="label">Dataset</span></li>
+      <li class="wizard-step" data-step="2"><span class="num">2</span><span class="label">Features & preprocessing</span></li>
+      <li class="wizard-step" data-step="3"><span class="num">3</span><span class="label">Algorithm</span></li>
+      <li class="wizard-step" data-step="4"><span class="num">4</span><span class="label">Configuration</span></li>
+      <li class="wizard-step" data-step="5"><span class="num">5</span><span class="label">Review</span></li>
+    </ol>
+    <div id="wizard-body" class="card"></div>
+  `;
+
+  // Wizard state — K and seed are NOT user-editable in this prototype.
+  // Per SYS-05 §D.1 config-only: K and random_seed come from the
+  // configuration snapshot (cfg.k_value, cfg.random_seed). They are
+  // exposed as read-only display in Step 4 and Step 5.
+  const state={step:1,dataset:MOCK.dataset.id,algorithm:"kmeans"};
+
+  setTimeout(()=>{
+    const body=el.querySelector("#wizard-body");
+    const stepsEl=el.querySelector("#wizard-steps");
+
+    // Helper: resolve the config snapshot for the current algorithm and
+    // return its K / random_seed values (read-only).
+    function cfgSnapshot(){
+      return MOCK.configs.find(c=>c.algo===state.algorithm);
+    }
+    function setStep(n){
+      state.step=n;
+      [...stepsEl.querySelectorAll(".wizard-step")].forEach(s=>{
+        const k=+s.dataset.step;
+        s.classList.toggle("active",k===n);
+        s.classList.toggle("complete",k<n);
+      });
+      renderStep();
+    }
+    function footer(){
+      return `
+        <div style="display:flex;justify-content:space-between;margin-top:20px;padding-top:16px;border-top:1px solid var(--color-border)">
+          <button class="btn btn-secondary" data-act="back" ${state.step===1?"disabled":""}><i data-lucide="arrow-left" class="icon"></i>Back</button>
+          <div style="display:flex;gap:8px">
+            <a class="btn btn-ghost" href="#/experiments">Cancel</a>
+            ${state.step<5
+              ?`<button class="btn btn-primary" data-act="next">Next<i data-lucide="arrow-right" class="icon"></i></button>`
+              :`<button class="btn btn-primary" data-act="run"><i data-lucide="play" class="icon"></i>Run experiment</button>`}
+          </div>
+        </div>`;
+    }
+    function renderStep(){
+      if(state.step===1){
+        body.innerHTML=`
+          <h3>Step 1 · Dataset</h3>
+          <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">Select the dataset to cluster. Only validated datasets are selectable.</p>
+          <div class="field">
+            <label>Dataset</label>
+            <select class="select" id="ds-sel">
+              <option value="ds_fe06_v1_0" selected>${MOCK.dataset.name} (${MOCK.dataset.version})</option>
+            </select>
+            <div class="help">Dataset is read-only and content-addressed (SHA-256 verified before run).</div>
+          </div>
+          <div class="config-row">
+            <div>
+              <div class="label">SHA-256</div>
+              <div class="value" style="margin-top:4px">${MOCK.dataset.sha256.slice(0,32)}…</div>
+            </div>
+            <div style="text-align:right">
+              <div class="label">Status</div>
+              <div style="margin-top:4px">${statusBadge("VALID")}</div>
+            </div>
+          </div>
+          ${footer()}`;
+      } else if(state.step===2){
+        body.innerHTML=`
+          <h3>Step 2 · Feature set & preprocessing</h3>
+          <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">Both fields are fixed to the current research working baseline. No alternative is offered in this prototype.</p>
+          <div class="field">
+            <label>Feature set</label>
+            <div class="config-row">
+              <div>
+                <div style="font-weight:600">RFM Extended</div>
+                <div class="card-subtitle">14 features (Recency, Frequency, Monetary, TotalQuantity, AverageQuantity, BasketSize, TenureDays, PurchaseIntervalMean, PurchaseIntervalStd, ActiveDays, AverageInvoiceValue, ProductsPerInvoice, CancellationRate, ReturnRate)</div>
+              </div>
+              ${statusBadge("BASELINE")}
+            </div>
+            <div class="help">RFM-only is <span class="badge badge-future-work" style="font-size:10px">Future work</span> per ADR-0004 RQ2 reformulation. Not selectable in this prototype.</div>
+          </div>
+          <div class="field">
+            <label>Preprocessing</label>
+            <div class="config-row">
+              <div>
+                <div style="font-weight:600">FE-06 C7</div>
+                <div class="card-subtitle">median imputation + Yeo-Johnson + RobustScaler</div>
+              </div>
+              ${statusBadge("WORKING_ASSUMPTION")}
+            </div>
+            <div class="help">C7 is the current working assumption. Promotion to final requires a new ADR (per <code>AGENTS.md</code> §2.10).</div>
+          </div>
+          ${footer()}`;
+      } else if(state.step===3){
+        body.innerHTML=`
+          <h3>Step 3 · Algorithm</h3>
+          <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">Five algorithms are in scope (ADR-0003). K-Medoids is OUT and is not shown.</p>
+          <div class="algo-cards">
+            ${MOCK.algorithms.map(a=>`
+              <div class="algo-card ${a.id===state.algorithm?'selected':''}" data-algo="${a.id}">
+                <div class="name">${a.name}</div>
+                <div class="family">${a.family}</div>
+                <div class="desc">${a.desc}</div>
+              </div>`).join("")}
+          </div>
+          <div class="help" style="margin-top:12px"><i data-lucide="info" style="width:12px;height:12px;display:inline-block;vertical-align:-2px"></i> Note: K-Medoids is <strong>not</strong> listed (OUT OF SCOPE per ADR-0003). 5 algorithms only.</div>
+          ${footer()}`;
+      } else if(state.step===4){
+        const cfg=cfgSnapshot();
+        // Render read-only K + seed from the configuration snapshot.
+        // Algorithm × K-applicability table (per SYS-06 §S-05):
+        //   K-Means / Agglomerative / GMM / FCM = K applicable
+        //   DBSCAN                                  = K not applicable
+        // UI never exposes an override field for K or random_seed in default flow.
+        const kReadOnly = cfg.k_applicable
+          ? `<div class="kv-row"><dt>${cfg.k_alias || "Number of clusters (K)"}</dt><dd><code style="font-size:14px">${cfg.k_value}</code> <span class="badge badge-baseline" style="font-size:10px"><i data-lucide="lock" style="width:10px;height:10px"></i> From config</span></dd></div>`
+          : `<div class="kv-row"><dt>Number of clusters (K)</dt><dd><span class="badge badge-not-available"><i data-lucide="minus-circle" class="icon"></i>Not applicable (DBSCAN)</span> <span style="font-size:11px;color:var(--color-text-muted);margin-left:6px">${cfg.k_note || ""}</span></dd></div>`;
+        const seedReadOnly = cfg.random_seed===null
+          ? `<div class="kv-row"><dt>Random seed</dt><dd><span class="badge badge-not-available"><i data-lucide="minus-circle" class="icon"></i>Not applicable</span> <span style="font-size:11px;color:var(--color-text-muted);margin-left:6px">${cfg.random_seed_note || ""}</span></dd></div>`
+          : `<div class="kv-row"><dt>Random seed</dt><dd><code style="font-size:14px">${cfg.random_seed}</code> <span class="badge badge-baseline" style="font-size:10px"><i data-lucide="lock" style="width:10px;height:10px"></i> From config</span></dd></div>`;
+        body.innerHTML=`
+          <h3>Step 4 · Configuration</h3>
+          <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">
+            Algorithm-specific parameters come from the active configuration.
+            The UI displays <code>K</code> and <code>random_seed</code> as a read-only snapshot from the configuration — these are <strong>trace-level knobs</strong> declared by EXP-02 / EXP-05 and are <strong>not user-editable</strong> in the default flow (per <code>SYS-05</code> §D.1 config-only principle).
+          </p>
+          <div class="field">
+            <label>Active configuration</label>
+            <div class="config-row">
+              <div>
+                <div style="font-weight:600"><code>${cfg.id}</code></div>
+                <div class="card-subtitle">version <code>${cfg.version}</code></div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" disabled title="Configuration detail screen is not in SYS-06 prototype scope"><i data-lucide="lock" class="icon"></i>Configuration view — out of prototype scope</button>
+            </div>
+            <div class="help">All algorithm hyperparameters (eps, min_samples, linkage, covariance_type, fuzziness, n_init, max_iter, random_seed override) come from this configuration. Inline override is <span class="badge badge-review-required" style="font-size:10px">Review required</span> (per <code>SYS-05</code> D.1).</div>
+          </div>
+
+          <div class="card" style="background:var(--color-surface-2);padding:12px 16px;margin-bottom:16px">
+            <h4 style="font-size:13px;margin-bottom:8px">Trace-level knobs (read-only, from configuration)</h4>
+            <dl class="kv" style="font-size:13px">
+              ${kReadOnly}
+              ${seedReadOnly}
+            </dl>
+            <div class="help" style="margin-top:8px;font-size:11px"><i data-lucide="info" style="width:12px;height:12px;display:inline-block;vertical-align:-2px"></i> Override of K or <code>random_seed</code> via request body is currently <span class="badge badge-review-required" style="font-size:10px">Review required</span> (<code>SYS-05</code> §15 item 8). When not approved, the wizard only displays the config value.</div>
+          </div>
+
+          <h4 style="font-size:13px;margin-bottom:8px">Algorithm × K-applicability</h4>
+          <table style="font-size:12px">
+            <thead><tr><th>Algorithm</th><th>K applicable?</th></tr></thead>
+            <tbody>
+              <tr><td>K-Means</td><td><span class="badge badge-success"><i data-lucide="check" class="icon"></i>Yes (K)</span></td></tr>
+              <tr><td>Agglomerative</td><td><span class="badge badge-success"><i data-lucide="check" class="icon"></i>Yes (K)</span></td></tr>
+              <tr><td>Gaussian Mixture (GMM)</td><td><span class="badge badge-success"><i data-lucide="check" class="icon"></i>Yes (<code>n_components</code>)</span></td></tr>
+              <tr><td>Fuzzy C-Means (FCM)</td><td><span class="badge badge-success"><i data-lucide="check" class="icon"></i>Yes (<code>c</code>)</span></td></tr>
+              <tr><td>DBSCAN</td><td><span class="badge badge-not-available"><i data-lucide="x" class="icon"></i>No — n_clusters_realized from density</span></td></tr>
+            </tbody>
+          </table>
+          <div class="help" style="margin-top:8px;font-size:11px">The K value is shown as <span class="badge badge-not-available" style="font-size:10px">Not applicable</span> when the selected algorithm does not accept K as input (DBSCAN). Validation does not require a K value in those cases.</div>
+
+          ${footer()}`;
+      } else if(state.step===5){
+        const cfg=cfgSnapshot();
+        const kDisplay = cfg.k_applicable
+          ? `<code>${cfg.k_value}</code> <span style="font-size:11px;color:var(--color-text-muted)">(${cfg.k_alias || "K"})</span>`
+          : `<span class="badge badge-not-available">Not applicable</span>`;
+        const seedDisplay = cfg.random_seed===null
+          ? `<span class="badge badge-not-available">Not applicable</span>`
+          : `<code>${cfg.random_seed}</code>`;
+        body.innerHTML=`
+          <h3>Step 5 · Review</h3>
+          <p style="font-size:13px;color:var(--color-text-muted);margin-bottom:16px">Confirm the configuration. The run will be recorded with the 5-field reproducibility contract (input SHA, config hash, seed, environment, output SHA).</p>
+          <dl class="kv">
+            <dt>Dataset</dt><dd>${MOCK.dataset.name} (${MOCK.dataset.version})</dd>
+            <dt>Feature set</dt><dd>RFM Extended (14 features)</dd>
+            <dt>Preprocessing</dt><dd>FE-06 C7 (working assumption)</dd>
+            <dt>Algorithm</dt><dd>${algoName(state.algorithm)}</dd>
+            <dt>Configuration</dt><dd>${cfg.id} v${cfg.version.slice(1)}</dd>
+            <dt>K</dt><dd>${kDisplay} <span style="font-size:11px;color:var(--color-text-muted)">— read-only snapshot from config</span></dd>
+            <dt>Seed</dt><dd>${seedDisplay} <span style="font-size:11px;color:var(--color-text-muted)">— read-only snapshot from config</span></dd>
+            <dt>Input SHA-256</dt><dd style="word-break:break-all">${MOCK.dataset.sha256}</dd>
+          </dl>
+          <div class="divider"></div>
+          <div class="help" style="font-size:12px"><i data-lucide="info" style="width:12px;height:12px;display:inline-block;vertical-align:-2px"></i> This run does not produce a "best algorithm" claim. Results are evidence only.</div>
+          ${footer()}`;
+      }
+      body.querySelectorAll('[data-act="back"]').forEach(b=>b.addEventListener("click",()=>setStep(state.step-1)));
+      body.querySelectorAll('[data-act="next"]').forEach(b=>b.addEventListener("click",()=>setStep(Math.min(5,state.step+1))));
+      body.querySelectorAll('[data-act="run"]').forEach(b=>b.addEventListener("click",()=>{
+        navigate("#/experiments/run_e_0007");
+        toast("Experiment queued. Redirecting to live status…","success");
+      }));
+      body.querySelectorAll(".algo-card").forEach(c=>{
+        c.addEventListener("click",()=>{
+          state.algorithm=c.dataset.algo;
+          // Re-render Step 4 so that K and seed snapshot switch to the new
+          // algorithm's config (DBSCAN hides K; FCM/GMM show their K alias).
+          body.querySelectorAll(".algo-card").forEach(x=>x.classList.toggle("selected",x===c));
+          if(state.step===4){renderStep();}
+        });
+      });
+      // K and random_seed are no longer user-editable inputs in the wizard
+      // (per SYS-05 §D.1 config-only). Their values are read directly from
+      // the configuration snapshot. No #k-in or #seed-in listeners.
+      initIcons();
+    }
+    setStep(1);
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Running
+   ============================================================ */
+function renderRunning(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <h1 style="margin-bottom:16px">Experiment <code style="font-size:14px">run_e_0007</code></h1>
+    <div style="display:flex;gap:8px;margin-bottom:16px">${statusBadge("RUNNING")}<span class="badge badge-pending">algorithm: K-Means</span><span class="badge badge-pending">K=5</span><span class="badge badge-pending">seed 42</span></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">
+            <div class="card-title">Progress</div>
+            <div style="font-size:12px;color:var(--color-text-muted)">Step 3 of 6 · Fitting K-Means (K=5)</div>
+          </div>
+          <div class="progress-track"><div class="progress-bar" id="prog" style="width:50%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--color-text-muted)">
+            <span id="elapsed">00:00:42</span>
+            <span>ETA ~00:00:36</span>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header"><div class="card-title">Current step</div></div>
+          <div style="font-size:13px">
+            <code>clustering/runner.py:fit_one</code> · K-Means with K=5, seed=42<br/>
+            <span style="color:var(--color-text-muted)">Iteration 9 of 18 · inertia 1,094.7 → 1,089.3</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div class="card-title">Logs</div><a class="btn btn-ghost btn-sm" href="#">Show full log</a></div>
+          <div class="log-box" id="log-box"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title" style="margin-bottom:12px">Run metadata</div>
+          <dl class="kv">
+            <dt>Algorithm</dt><dd>kmeans</dd>
+            <dt>K</dt><dd>5</dd>
+            <dt>Seed</dt><dd>42</dd>
+            <dt>Config</dt><dd>clustering_kmeans_default v1</dd>
+            <dt>Input SHA-256</dt><dd style="word-break:break-all">${MOCK.dataset.sha256.slice(0,24)}…</dd>
+          </dl>
+        </div>
+        <div class="card">
+          <button class="btn btn-danger" id="cancel-btn" style="width:100%"><i data-lucide="ban" class="icon"></i>Cancel experiment</button>
+          <div class="help" style="margin-top:8px">Cancellation is only effective while the job is in <strong>queued</strong> or <strong>running</strong> state.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  setTimeout(()=>{
+    const log=el.querySelector("#log-box");
+    const lines=[
+      "[11:00:01] Loaded dataset sha256: ba54033e…",
+      "[11:00:01] Loaded config clustering_kmeans_default v1",
+      "[11:00:01] Validation OK (no NaN, no Inf, no constant feature)",
+      "[11:00:02] Starting K-Means with K=5 seed=42",
+      "[11:00:04] Iteration 1/18  inertia=1320.1",
+      "[11:00:08] Iteration 4/18  inertia=1120.7",
+      "[11:00:14] Iteration 7/18  inertia=1098.0",
+      "[11:00:24] Iteration 9/18  inertia=1089.3"
+    ];
+    log.innerHTML=lines.map(l=>`<span class="log-line"><span class="ts">${l.split("]")[0]}]</span>${l.split("]").slice(1).join("]")}</span>`).join("");
+    el.querySelector("#cancel-btn").addEventListener("click",async()=>{
+      const ok=await confirmDialog({title:"Cancel experiment?",body:"This will terminate <code>run_e_0007</code> and discard partial output. A new run will require a fresh invocation.",confirmText:"Yes, cancel",variant:"danger"});
+      if(ok) toast("Cancel signal sent. Job will terminate at next checkpoint.","info");
+    });
+    initIcons();
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Result Detail
+   ============================================================ */
+function renderResult(){
+  const exp=MOCK.experiments[0];
+  const m=MOCK.metrics.e1;
+  const dist=MOCK.clusterDist.e1;
+  const distArr=Object.entries(dist).map(([k,v])=>({id:k,n:v.n}));
+  const maxN=Math.max(...distArr.map(d=>d.n));
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:12px">
+      <h1>${algoName(exp.algo)} · K=${exp.k}</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">
+        <code>${exp.id}</code> · ${MOCK.dataset.name} (${MOCK.dataset.version}) · RFM Extended 14 features · ${statusBadge("SUCCEEDED")}
+      </p>
+    </div>
+
+    <nav class="tabs" id="result-tabs">
+      <button class="tab active" data-tab="overview">Overview</button>
+      <button class="tab" data-tab="evaluation">Evaluation</button>
+      <button class="tab" data-tab="distribution">Cluster distribution</button>
+      <button class="tab" data-tab="stability">Stability</button>
+      <button class="tab" data-tab="lineage">Lineage</button>
+    </nav>
+
+    <div id="tab-content"></div>
+  `;
+  setTimeout(()=>{
+    const tabBtns=el.querySelectorAll("#result-tabs .tab");
+    const tc=el.querySelector("#tab-content");
+    function show(tab){
+      tabBtns.forEach(b=>b.classList.toggle("active",b.dataset.tab===tab));
+      if(tab==="overview"){
+        tc.innerHTML=`
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px">
+            <div class="card">
+              <h4 style="margin-bottom:12px">Run summary</h4>
+              <dl class="kv">
+                <dt>Algorithm</dt><dd>${algoName(exp.algo)}</dd>
+                <dt>K</dt><dd>${exp.k}</dd>
+                <dt>Seed</dt><dd>${exp.seed}</dd>
+                <dt>Configuration</dt><dd><code>clustering_kmeans_default</code> v1</dd>
+                <dt>Status</dt><dd>${statusBadge("SUCCEEDED")}</dd>
+                <dt>Started</dt><dd>${exp.created_at}</dd>
+                <dt>Duration</dt><dd>${exp.duration_s} s</dd>
+                <dt>Dataset</dt><dd>${MOCK.dataset.name} (${MOCK.dataset.version})</dd>
+              </dl>
+            </div>
+            <div class="card">
+              <h4 style="margin-bottom:12px">Quick links</h4>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <a class="btn btn-secondary btn-sm" href="#/profiling/run_e_0001/kmeans/0"><i data-lucide="users" class="icon"></i>View segments</a>
+                <a class="btn btn-secondary btn-sm" href="#/evaluation"><i data-lucide="bar-chart-3" class="icon"></i>Compare with other runs</a>
+                <button class="btn btn-secondary btn-sm" id="rerun-btn"><i data-lucide="refresh-cw" class="icon"></i>Re-run with same seed</button>
+              </div>
+              <div class="help" style="margin-top:8px">Re-run reproduces <code>${exp.id}</code> per EXP-05 Block R; labels must be identical (NFR-01).</div>
+            </div>
+          </div>`;
+        el.querySelector("#rerun-btn").addEventListener("click",()=>toast("Re-run queued. Will appear in the Experiments list.","info"));
+      } else if(tab==="evaluation"){
+        tc.innerHTML=`
+          <div class="card">
+            <h4 style="margin-bottom:12px">Internal metrics</h4>
+            <div class="metric-row">
+              <div class="metric">
+                <div class="metric-label">Silhouette <span style="color:var(--color-text-subtle)">(primary)</span></div>
+                <div class="metric-value">${m.silhouette.toFixed(4)}</div>
+                <div class="diag-only">higher = better</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Davies-Bouldin</div>
+                <div class="metric-value">${m.dbi.toFixed(3)}</div>
+                <div class="diag-only">lower = better</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Calinski-Harabasz</div>
+                <div class="metric-value">${m.ch.toFixed(1)}</div>
+                <div class="diag-only">higher = better</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">WCSS ${statusBadge("DIAGNOSTIC_ONLY")}</div>
+                <div class="metric-value">${m.wcss!=null?m.wcss.toFixed(1):"n/a"}</div>
+                <div class="diag-only">diagnostic only</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Runtime (s)</div>
+                <div class="metric-value">${m.runtime.toFixed(2)}</div>
+                <div class="diag-only">n_repeat=5</div>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <p style="font-size:12px;color:var(--color-text-muted)">
+              Metrics are descriptive evidence only. <strong>No</strong> best/winner/optimal claim is computed (per <code>AGENTS.md</code> §2.5 and FR-EVAL-09).
+            </p>
+          </div>`;
+      } else if(tab==="distribution"){
+        tc.innerHTML=`
+          <div class="card">
+            <h4 style="margin-bottom:8px">Cluster size distribution (n=4,371)</h4>
+            <div class="bar-chart" style="height:180px">
+              ${distArr.map(d=>`<div class="bar" style="height:${(d.n/maxN)*100}%"><span class="val">${d.n.toLocaleString()}</span></div>`).join("")}
+            </div>
+            <div class="bar-labels">
+              ${distArr.map(d=>`<span>Cluster ${d.id}</span>`).join("")}
+            </div>
+            <div class="divider"></div>
+            <p style="font-size:12px;color:var(--color-text-muted)">For DBSCAN, noise (−1) is shown with a hatched pattern and is <strong>not</strong> a customer segment.</p>
+          </div>`;
+      } else if(tab==="stability"){
+        tc.innerHTML=`
+          <div class="card">
+            <h4 style="margin-bottom:12px">Stability evidence</h4>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+              ${statusBadge("NOT_REQUESTED")}
+              <span style="font-size:13px;color:var(--color-text-muted)">Stability metrics not yet produced for this run.</span>
+            </div>
+            <div class="divider"></div>
+            <h4 style="margin-bottom:8px">Evidence blocks (per EXP-05)</h4>
+            <table>
+              <thead><tr><th>Block</th><th>Coverage</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td>R (reproducibility)</td><td>Same seed → identical labels</td><td>${statusBadge("SUCCEEDED")} (logged in run manifest)</td></tr>
+                <tr><td>S (seed sweep)</td><td>Seeds [42, 7, 123, 2024, 1729] (K-Means/GMM/FCM only)</td><td>${statusBadge("NOT_REQUESTED")}</td></tr>
+                <tr><td>N (perturbation)</td><td>σ ∈ {0, 0.01, 0.05} × column std</td><td>${statusBadge("NOT_REQUESTED")}</td></tr>
+              </tbody>
+            </table>
+            <div class="divider"></div>
+            <div class="help">
+              ARI, AMI, Hungarian matching, statistical tests and confidence intervals are <span class="badge badge-review-required" style="font-size:10px">Review required</span> methodology decisions. They are <strong>not</strong> computed as a UI requirement at this phase (per SYS-05 §9 E.2 and METHODOLOGY_LOCK_STATUS §4).
+            </div>
+          </div>`;
+      } else if(tab==="lineage"){
+        tc.innerHTML=`
+          <div class="card">
+            <h4 style="margin-bottom:12px">Lineage &amp; reproducibility (5-field contract)</h4>
+            <dl class="kv">
+              <dt>Input SHA-256</dt><dd style="word-break:break-all">${MOCK.dataset.sha256}</dd>
+              <dt>Config hash</dt><dd style="word-break:break-all">sha256:8b2d9f1c…</dd>
+              <dt>Seed</dt><dd>${exp.seed}</dd>
+              <dt>Environment</dt><dd>Python 3.11 · numpy 1.26 · pandas 2.1 · scikit-learn 1.4</dd>
+              <dt>Output SHA-256</dt><dd style="word-break:break-all">sha256:c4e0a171… (computed at write time)</dd>
+              <dt>Manifest</dt><dd><a href="#">reports/exp01/run_e_0001/run_e_0001_manifest.json</a></dd>
+            </dl>
+          </div>`;
+      }
+      initIcons();
+    }
+    tabBtns.forEach(b=>b.addEventListener("click",()=>show(b.dataset.tab)));
+    show("overview");
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Evaluation Compare
+   ============================================================ */
+function renderEvaluation(){
+  const runs=["e1","e2","e3","e4","e5","e6"].map(k=>({key:k,...MOCK.metrics[k],algo:{"e1":"kmeans","e2":"kmeans","e3":"agglomerative","e4":"dbscan","e5":"gmm","e6":"fcm"}[k],k:{"e1":4,"e2":3,"e3":4,"e4":null,"e5":4,"e6":4}[k],realizedK:{"e1":null,"e2":null,"e3":null,"e4":2,"e5":null,"e6":null}[k]}));
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:16px">
+      <h1>Evaluation</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">Side-by-side comparison of internal metrics across runs. No ranking, no score, no winner.</p>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:12px 16px;border-bottom:1px solid var(--color-border);display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--color-text-muted)">${runs.length} runs selected</span>
+        <button class="btn btn-secondary btn-sm" id="add-btn"><i data-lucide="plus" class="icon"></i>Add run</button>
+        <button class="btn btn-secondary btn-sm" id="export-btn"><i data-lucide="download" class="icon"></i>Export CSV</button>
+        <span style="margin-left:auto" class="badge badge-review-required"><i data-lucide="alert-triangle" class="icon"></i>Stability column: Review required</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Algorithm</th><th>K</th>
+              <th>Silhouette <span style="text-transform:none;font-weight:400;color:var(--color-text-subtle)">(primary)</span></th>
+              <th>Davies-Bouldin</th>
+              <th>Calinski-Harabasz</th>
+              <th>WCSS ${statusBadge("DIAGNOSTIC_ONLY")}</th>
+              <th>Runtime (s)</th>
+              <th>Stability</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${runs.map(r=>`
+              <tr>
+                <td>${algoName(r.algo)}</td>
+                <td>${r.k??`<span style="color:var(--color-text-subtle)">realized ${r.realizedK}</span>`}</td>
+                <td>${r.silhouette!=null?r.silhouette.toFixed(4):"n/a"}</td>
+                <td>${r.dbi!=null?r.dbi.toFixed(3):"n/a"}</td>
+                <td>${r.ch!=null?r.ch.toFixed(1):"n/a"}</td>
+                <td>${r.wcss!=null?r.wcss.toFixed(1):"n/a"}</td>
+                <td>${r.runtime!=null?r.runtime.toFixed(2):"n/a"}</td>
+                <td>${statusBadge(r.stability||"NOT_REQUESTED")}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted);background:var(--color-surface-2)">
+        Sortable by clicking column header. The UI does not apply a "best" or "winner" highlight per <code>AGENTS.md</code> §2.5 and FR-EVAL-09. Frontend may add visual sort; methodology gate remains unchanged.
+      </div>
+    </div>
+  `;
+  setTimeout(()=>{
+    el.querySelector("#export-btn").addEventListener("click",()=>toast("CSV export would download <code>evaluation_compare.csv</code> in production.","info"));
+    el.querySelector("#add-btn").addEventListener("click",()=>toast("Add-run drawer would open in production.","info"));
+    initIcons();
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Profiling Overview
+   ============================================================ */
+function renderProfiling(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:16px">
+      <h1>Profiling</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">Per-cluster descriptive profile. Business labels are <span class="badge badge-naming-pending" style="font-size:10px">Naming pending</span> until CP-04 mapping is approved.</p>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label style="margin:0">Algorithm</label>
+        <select class="select" id="algo-sel" style="max-width:200px">
+          ${MOCK.algorithms.map(a=>`<option value="${a.id}" ${a.id==='kmeans'?'selected':''}>${a.name}</option>`).join("")}
+        </select>
+        <label style="margin-left:12px">Run</label>
+        <select class="select" style="max-width:260px">
+          <option>run_e_0001 · K-Means K=4 · 2026-10-01</option>
+        </select>
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Segment</th><th>Size</th><th>Share of total</th><th>Status</th><th>Business label</th><th></th></tr></thead>
+        <tbody id="seg-tbody"></tbody>
+      </table>
+    </div>
+  `;
+  setTimeout(()=>{
+    const tbody=el.querySelector("#seg-tbody");
+    const segs=MOCK.segments.e1;
+    tbody.innerHTML=segs.map(s=>`
+      <tr>
+        <td><strong>Segment ${s.id}</strong></td>
+        <td>${s.size.toLocaleString()}</td>
+        <td>${(s.share*100).toFixed(1)}%</td>
+        <td>${statusBadge(s.status)}</td>
+        <td style="color:var(--color-text-subtle)">${s.business_label}</td>
+        <td style="text-align:right"><a class="btn btn-secondary btn-sm" href="#/profiling/run_e_0001/kmeans/${s.id}">View detail</a></td>
+      </tr>`).join("");
+    initIcons();
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Segment Detail
+   ============================================================ */
+function renderSegmentDetail(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:12px">
+      <h1>Segment 0 · K-Means (run_e_0001)</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">
+        Size 1,100 · share 25.2% · ${statusBadge("NAMING_PENDING")} · Business label: <em>Not assigned</em>
+      </p>
+    </div>
+    <div class="metric-row" style="margin-bottom:16px">
+      <div class="metric"><div class="metric-label">Size (n)</div><div class="metric-value">1,100</div></div>
+      <div class="metric"><div class="metric-label">Share of assigned</div><div class="metric-value">25.2%</div></div>
+      <div class="metric"><div class="metric-label">Share of total</div><div class="metric-value">25.2%</div></div>
+      <div class="metric"><div class="metric-label">RFM tier (R/F/M)</div><div class="metric-value" style="font-size:14px">high / mid / mid</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <h4 style="margin-bottom:8px">Feature statistics (placeholder values for UI review)</h4>
+      <table>
+        <thead><tr><th>Feature</th><th>Status</th><th>Mean</th><th>Median</th><th>Std</th><th>p25</th><th>p75</th><th>Min</th><th>Max</th></tr></thead>
+        <tbody>
+          ${MOCK.features.map(f=>`
+            <tr>
+              <td>${f.name}</td>
+              <td>${statusBadge(f.status)}</td>
+              <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <p style="font-size:12px;color:var(--color-text-muted)">Rows show <code>—</code> for the prototype. In production, values come from <code>/profiling/runs/{id}</code> and reflect this cluster's distribution only.</p>
+    </div>
+
+    <div class="card">
+      <h4 style="margin-bottom:8px">Distinguishing features (per CP-03 evidence)</h4>
+      <p style="font-size:13px;color:var(--color-text-muted)">To be populated from CP-03 evidence. UI does not synthesise distinguishing-feature claims from raw metrics.</p>
+    </div>
+  `;
+  return el;
+}
+
+/* ============================================================
+   Page: Reports List
+   ============================================================ */
+function renderReportsList(){
+  const reports=[
+    {id:"r_0001",title:"Phase 7 experiment summary (placeholder)",stage:"evaluation",created_at:"2026-10-07T10:30:00Z",size:"12 KB",inputs:6},
+    {id:"r_0002",title:"Stability evidence (placeholder)",stage:"stability",created_at:"2026-10-07T10:00:00Z",size:"8 KB",inputs:0}
+  ];
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:16px">
+      <h1>Reports</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">Reports are exported locally. No commit, push, or PR action exists in this prototype.</p>
+    </div>
+    <div class="card" style="padding:0">
+      <table>
+        <thead><tr><th>Title</th><th>Stage</th><th>Inputs</th><th>Size</th><th>Generated</th><th></th></tr></thead>
+        <tbody>
+          ${reports.map(r=>`
+            <tr>
+              <td><a href="#/reports/${r.id}">${r.title}</a></td>
+              <td>${r.stage}</td>
+              <td>${r.inputs}</td>
+              <td>${r.size}</td>
+              <td style="font-size:12px;color:var(--color-text-muted)">${r.created_at.replace("T"," ").slice(0,16)}</td>
+              <td style="text-align:right"><a class="btn btn-secondary btn-sm" href="#/reports/${r.id}">View</a></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+  return el;
+}
+
+/* ============================================================
+   Page: Report Detail
+   ============================================================ */
+function renderReportDetail(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:12px">
+      <h1>Phase 7 experiment summary (placeholder)</h1>
+      <p style="font-size:13px;color:var(--color-text-muted);margin-top:4px">
+        <code>r_0001</code> · markdown · generated 2026-10-07 · ${statusBadge("WORKING_ASSUMPTION")}
+      </p>
+    </div>
+    <div class="card">
+      <h4 style="margin-bottom:8px">Inputs</h4>
+      <ul style="font-size:13px;color:var(--color-text-muted);margin:0 0 16px 18px;line-height:1.7">
+        <li>evaluation_run_ids: <code>run_e_0001</code>, <code>run_e_0002</code>, <code>run_e_0003</code>, <code>run_e_0004</code>, <code>run_e_0005</code>, <code>run_e_0006</code></li>
+        <li>profiling_run_ids: (none)</li>
+        <li>configs: <code>clustering_*_default v1</code> × 5</li>
+      </ul>
+      <h4 style="margin-bottom:8px">Preview</h4>
+      <pre style="background:var(--color-surface-2);padding:12px;border-radius:6px;font-size:12px;line-height:1.5;max-height:280px;overflow:auto;color:var(--color-text-muted)"># Phase 7 experiment summary (placeholder)
+
+This is a UI-prototype mock. In production, this section
+renders the generated Markdown report.
+
+The report does not contain a "best algorithm" or
+"winner" claim per AGENTS.md §2.5 and SYS-01 FR-EVAL-09.
+
+WCSS values are marked "diagnostic only" per
+methodology_overview.md §3.6.
+
+DBSCAN noise (-1) is reported separately, not as a
+customer segment.</pre>
+      <div class="divider"></div>
+      <button class="btn btn-secondary" id="dl"><i data-lucide="download" class="icon"></i>Download (local only)</button>
+    </div>
+  `;
+  setTimeout(()=>{
+    el.querySelector("#dl").addEventListener("click",()=>toast("In production this would download a local file. No remote action is offered.","info"));
+    initIcons();
+  },0);
+  return el;
+}
+
+/* ============================================================
+   Page: Marketing Placeholder
+   ============================================================ */
+function renderMarketing(){
+  const el=document.createElement("div");
+  el.innerHTML=`
+    ${mockBanner()}
+    <div style="margin-bottom:16px">
+      <h1>Marketing recommendation</h1>
+    </div>
+    <div class="card" style="text-align:center;padding:48px 24px">
+      <div style="display:inline-flex;margin-bottom:16px">${statusBadge("REVIEW_REQUIRED")}</div>
+      <h2 style="font-size:18px;margin-bottom:8px">Marketing framework pending</h2>
+      <p style="font-size:13px;color:var(--color-text-muted);max-width:560px;margin:0 auto 16px;line-height:1.6">
+        The Marketing Recommendation module is expected to inherit from a dedicated <code>MKT-01..MKT-05</code> framework.
+        These documents are not present in the repository yet. This UI section is therefore a placeholder and will
+        not synthesise marketing strategies, KPIs, or recommendations from clustering results.
+      </p>
+      <div style="font-size:12px;color:var(--color-text-muted);background:var(--color-surface-2);
+        border:1px solid var(--color-border);border-radius:6px;padding:12px 16px;
+        display:inline-block;text-align:left;max-width:560px;margin-top:8px">
+        <div style="font-weight:600;color:var(--color-text);margin-bottom:4px">What this module will do (when MKT framework exists)</div>
+        <ul style="margin:0 0 0 18px;line-height:1.7">
+          <li>Show per-segment Marketing Objective, Strategy, Recommended Action, KPI, Evidence, Limitation</li>
+          <li>Filter out DBSCAN noise (−1) from any marketing target</li>
+          <li>Not convert internal clustering metrics into business effectiveness claims</li>
+          <li>Provide read-only recommendations, not campaign automation</li>
+        </ul>
+      </div>
+    </div>
+  `;
+  return el;
+}
+
+/* ============================================================
+   Init
+   ============================================================ */
+initIcons();
+render();
+</script>
+</body>
+</html>

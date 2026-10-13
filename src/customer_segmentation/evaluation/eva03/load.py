@@ -326,16 +326,22 @@ def build_block_n_pairwise_table(
                 return (0.0, -1.0)
             return (sigma, pseed)
 
+        # INVARIANT: Each run_id in an EXP-05 labels artifact has one row
+        # per (run, CustomerID). Deduplicate runs by run_id BEFORE building
+        # the pairwise grid; otherwise the grid dimensions reflect the
+        # number of customer-rows (incorrect) instead of the number of
+        # unique runs.
         df_sorted = df_a.assign(_sort_key=df_a.apply(sort_key, axis=1))
         df_sorted = df_sorted.sort_values("_sort_key")
-        runs = df_sorted["run_id"].tolist()
+        runs_df = df_sorted.drop_duplicates(subset=["run_id"], keep="first")
+        runs = runs_df["run_id"].tolist()
         sigmas: list[float] = []
         pseeds: list[float] = []
-        for _, r in df_sorted.iterrows():
+        for _, r in runs_df.iterrows():
             sigmas.append(float(r.get("sigma") or 0.0))
             pseeds.append(float(r.get("perturbation_seed") or -1.0))
         series_list = [
-            _labels_series_for_run(df_sorted, run_id) for run_id in runs
+            _labels_series_for_run(runs_df, run_id) for run_id in runs
         ]
         if not all(s.index.equals(series_list[0].index) for s in series_list):
             common = series_list[0].index

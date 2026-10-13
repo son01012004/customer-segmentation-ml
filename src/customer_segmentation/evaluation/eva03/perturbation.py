@@ -121,18 +121,23 @@ def analyze_block_n(
                 return (0.0, -1.0)
             return (sigma, pseed)
 
-        df_sorted = df_a.assign(_sort=df_a.apply(sort_key, axis=1)).sort_values("_sort")
-        runs = df_sorted["run_id"].tolist()
+        # INVARIANT: Each run_id in an EXP-05 labels artifact has one row
+        # per (run, CustomerID). To avoid customer-row expansion, we MUST
+        # deduplicate runs by run_id BEFORE building the pairwise grid.
+        # Sort order: sigma=0 first, then (sigma, perturbation_seed) ascending.
+        sort_df = df_a.assign(_sort=df_a.apply(sort_key, axis=1)).sort_values("_sort")
+        runs_df = sort_df.drop_duplicates(subset=["run_id"], keep="first")
+        runs = runs_df["run_id"].tolist()
         sigmas: list[float] = []
         pseeds: list[float] = []
-        for _, r in df_sorted.iterrows():
+        for _, r in runs_df.iterrows():
             sigmas.append(float(r.get("sigma") or 0.0))
             pseeds.append(float(r.get("perturbation_seed") or -1.0))
         if len(runs) < 2:
             continue
 
         series_list = [
-            _series_for(df_sorted, run_id) for run_id in runs
+            _series_for(runs_df, run_id) for run_id in runs
         ]
         if not all(s.index.equals(series_list[0].index) for s in series_list):
             common = series_list[0].index

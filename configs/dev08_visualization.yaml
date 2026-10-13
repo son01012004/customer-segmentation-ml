@@ -1,0 +1,127 @@
+# ---------------------------------------------------------------------------
+# DEV-08 Prototype Visualization Dashboard configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-08 prototype visualization dashboard
+# pipeline. Loaded by
+# `customer_segmentation.prototype.visualization.config_loader`.
+#
+# Layout
+# ------
+#   dev08_visualization:
+#     schema_version: "1.0.0"            # Pinned; bump invalidates dashboard_id
+#     output_format: "png"               # "png" (default) | "svg"
+#     dpi: 120                           # matplotlib savefig dpi
+#     max_runs_per_chart: 30             # legibility guard for metric comparison
+#     max_features_per_heatmap: 30       # legibility guard for feature comparison
+#     include_noise_in_charts: false     # DBSCAN noise row policy
+#     include_noise_in_text: true        # text tables always include noise
+#     marketing_section: "placeholder"   # "placeholder" (Phase A) | "hidden"
+#     display:
+#       missing_value_placeholder: "--"
+#       disclaimer_text: "no ranking, recommendation, or winner annotation is emitted; values are post-preprocessing (scaled/transformed) — not directly interpretable in original business units"
+#       separator: "  "
+#     storage:
+#       output_dir_relative: "visualization"
+#     logging:
+#       level: "INFO"
+#       format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+#       emit_to_console: true
+#     research_safety:
+#       never_promote_to_research: true
+#       visualization_scope: "DASHBOARD_PROTOTYPE"
+#
+# Status: TECHNICALLY_IMPLEMENTED (DEV-08), NOT RESEARCH_APPROVED.
+# DEV-08 output is prototype-only. The research_safety block is always:
+#   automatically_promoted_to_research: false
+#   appeared_in_research_evidence: false
+#   scope: "DASHBOARD_PROTOTYPE"
+#
+# The dashboard never modifies research artefacts; it only READS
+# SegmentationManifest + EvaluationManifest + MarketingRecommendationManifest
+# and emits charts / text / JSON output under the storage root.
+# ---------------------------------------------------------------------------
+
+dev08_visualization:
+  # ---------------------------------------------------------------
+  # Schema version (pinned; bump invalidates dashboard_id).
+  # Bump chỉ khi dashboard output schema thay đổi incompatibly.
+  # ---------------------------------------------------------------
+  schema_version: "1.0.0"
+
+  # ---------------------------------------------------------------
+  # Chart output settings.
+  # output_format: "png" (default; lossless raster) | "svg" (vector).
+  # dpi: matplotlib savefig dpi (120 = prototype-acceptable quality).
+  # ---------------------------------------------------------------
+  output_format: "png"
+  dpi: 120
+
+  # ---------------------------------------------------------------
+  # Legibility guards.
+  # max_runs_per_chart: max number of EvaluationManifests in one
+  #   metric comparison chart (above this, callers MUST split
+  #   explicitly). Mirrors the DEV-08 chart module MAX_RUNS_PER_CHART
+  #   guard; the config value is the canonical override.
+  # max_features_per_heatmap: max number of feature names in one
+  #   feature-comparison heatmap.
+  # ---------------------------------------------------------------
+  max_runs_per_chart: 30
+  max_features_per_heatmap: 30
+
+  # ---------------------------------------------------------------
+  # DBSCAN noise policy.
+  # include_noise_in_charts: false by default — charts exclude the
+  #   noise row to avoid implying noise is a cluster (matches
+  #   cluster_distribution default).
+  # include_noise_in_text: true by default — text tables always
+  #   include the noise block so the raw manifest data is preserved.
+  # ---------------------------------------------------------------
+  include_noise_in_charts: false
+  include_noise_in_text: true
+
+  # ---------------------------------------------------------------
+  # Marketing section policy.
+  # "placeholder" (default; matches Phase A behavior — render
+  #   REVIEW_REQUIRED banner). "hidden" — omit the marketing section
+  #   entirely when marketing manifest is unavailable. The dashboard
+  #   MUST NOT generate actual marketing content.
+  # ---------------------------------------------------------------
+  marketing_section: "placeholder"
+
+  # ---------------------------------------------------------------
+  # Display conventions.
+  # missing_value_placeholder: text used for unavailable values.
+  # disclaimer_text: the single allowed occurrence of banned
+  #   substrings in dashboard output. Per AGENTS.md §2.5.
+  # separator: column separator for text tables.
+  # ---------------------------------------------------------------
+  display:
+    missing_value_placeholder: "--"
+    disclaimer_text: "no ranking, recommendation, or winner annotation is emitted; values are post-preprocessing (scaled/transformed) — not directly interpretable in original business units"
+    separator: "  "
+
+  # ---------------------------------------------------------------
+  # Storage layout (per-segmentation).
+  # The base path is built from the DEV-02 storage root + the
+  # canonical nested layout. The CLI does NOT expose --storage-root.
+  # ---------------------------------------------------------------
+  storage:
+    output_dir_relative: "visualization"
+
+  # ---------------------------------------------------------------
+  # Per-stage logging (mirrors DEV-04..07 layout).
+  # ---------------------------------------------------------------
+  logging:
+    level: "INFO"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+    emit_to_console: true
+
+  # ---------------------------------------------------------------
+  # Research safety (defence-in-depth; mirror DEV-04..07).
+  # Always sets visualization_scope = "DASHBOARD_PROTOTYPE" so the
+  # prototype layer never auto-promotes to research evidence.
+  # ---------------------------------------------------------------
+  research_safety:
+    never_promote_to_research: true
+    visualization_scope: "DASHBOARD_PROTOTYPE"

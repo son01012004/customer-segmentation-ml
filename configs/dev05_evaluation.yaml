@@ -1,0 +1,152 @@
+# ---------------------------------------------------------------------------
+# DEV-05 Prototype Evaluation Module configuration
+# ---------------------------------------------------------------------------
+#
+# Single source of truth for the DEV-05 prototype evaluation pipeline.
+# Loaded by `customer_segmentation.prototype.evaluation.config_loader`.
+#
+# Layout
+# ------
+#   dev05_evaluation:
+#     metrics:                         # Closed set of metric names DEV-05 emits
+#       enabled: [silhouette, davies_bouldin, calinski_harabasz]
+#     noise_policy:                    # "exclude" (default per ADR-0006) | "include"
+#       default: "exclude"
+#     display:
+#       missing_value_placeholder: "--"  # for CLI/display
+#       csv_missing_value: ""            # for metrics_long.csv
+#     logging:
+#       level: "INFO"
+#       format: ...
+#       log_dir_relative: "data/prototype/datasets"
+#       emit_to_console: true
+#     storage:
+#       output_dir_relative: "evaluation"   # relative to clustering/<cl_id>/
+#       emit_metrics_csv: true              # write metrics_long.csv
+#     research_safety:
+#       readonly_paths: [...]                # defence-in-depth
+#       never_promote_to_research: true
+#       evaluation_scope: "EVALUATED_PROTOTYPE"
+#     validation:
+#       min_samples: 2
+#       min_features: 1
+#       require_no_nan: true
+#       require_no_inf: true
+#       require_all_numeric: true
+#       exclude_customer_id_from_features: true
+#     compare:
+#       emit_singleton_group: true        # OQ-EVAL-04 (B)
+#       show_provenance_per_row: true
+#       disclaimer_text: "no ranking, recommendation, or winner annotation is emitted"
+#
+# Status: TECHNICALLY_IMPLEMENTED (DEV-05 Phase 2), NOT RESEARCH_APPROVED.
+# DEV-05 output is prototype-only. The research_safety block is always:
+#   automatically_promoted_to_research: false
+#   appeared_in_research_evidence: false
+#   scope: "EVALUATED_PROTOTYPE"
+#
+# Per ADR-0006 (Accepted 2026-10-09), the noise_policy default is
+# "exclude" for the prototype layer. Research-layer status of CON-15,
+# WA-08, EXP01-MET-01, and MENTOR_REVIEW_FORM line 47 is NOT modified
+# by this configuration file.
+# ---------------------------------------------------------------------------
+
+dev05_evaluation:
+  # ---------------------------------------------------------------
+  # Closed set of metric names DEV-05 emits (per AC-1).
+  # Order preserved as the canonical row order of metrics_long.csv.
+  # Default = all 3 internal metrics (silhouette, DBI, CH).
+  # ---------------------------------------------------------------
+  metrics:
+    enabled:
+      - "silhouette"
+      - "davies_bouldin"
+      - "calinski_harabasz"
+
+  # ---------------------------------------------------------------
+  # DBSCAN noise handling (per ADR-0006 prototype-scope decision).
+  # Default "exclude" applies uniform DBSCAN-noise exclusion to all
+  # three internal metrics. CLI --noise-policy flag provides per-call
+  # override; both values are recorded in evaluation_manifest.json
+  # (noise_policy_used field) for full audit reproducibility.
+  # ---------------------------------------------------------------
+  noise_policy:
+    default: "exclude"
+
+  # ---------------------------------------------------------------
+  # Display conventions (per OQ-EVAL-06 resolved decision).
+  # CLI/display: "--" (em-dash) for non-VALID_VALUE rows.
+  # CSV: blank cell (status column tells reader the value is intentionally empty).
+  # ---------------------------------------------------------------
+  display:
+    missing_value_placeholder: "--"
+    csv_missing_value: ""
+
+  # ---------------------------------------------------------------
+  # Per-stage logging (mirrors DEV-04 layout).
+  # ---------------------------------------------------------------
+  logging:
+    level: "INFO"
+    format: "%(asctime)s | %(levelname)-8s | %(name)s | %(stage)s | %(message)s"
+    log_dir_relative: "data/prototype/datasets"
+    emit_to_console: true
+
+  # ---------------------------------------------------------------
+  # Storage
+  # DEV-05 writes under:
+  #   <storage_root>/datasets/<dataset_id>/preprocessed/<preprocessed_id>/clustering/<clustering_id>/evaluation/<evaluation_id>/
+  # The storage root is read from configs/dev02_dataset_management.yaml
+  # (shared with DEV-02/03/04). CLI does NOT have --storage-root override.
+  # ---------------------------------------------------------------
+  storage:
+    # Relative path from the <clustering_id>/ dir.
+    # <clustering_dir>/evaluation/<evaluation_id>/
+    output_dir_relative: "evaluation"
+    # Whether to write metrics_long.csv alongside evaluation_manifest.json.
+    emit_metrics_csv: true
+
+  # ---------------------------------------------------------------
+  # Research safety (defence-in-depth; mirror DEV-04).
+  # Always sets scope = "EVALUATED_PROTOTYPE" so the prototype layer
+  # never auto-promotes to research evidence.
+  # ---------------------------------------------------------------
+  research_safety:
+    readonly_paths:
+      - "data/raw/primary"
+      - "data/raw/backup"
+      - "data/processed"
+      - "reports"
+    never_promote_to_research: true
+    evaluation_scope: "EVALUATED_PROTOTYPE"
+
+  # ---------------------------------------------------------------
+  # Input validation (mirrors ML-01 FrameworkConfig.validation).
+  # DEV-05 re-reads the DEV-04 cluster_labels parquet and the DEV-03
+  # ML Dataset parquet for X. These settings mirror ML-01's validation
+  # policy. The CustomerID leak check (exclude_customer_id_from_features)
+  # is critical because the metric is computed on a feature matrix that
+  # must not include the customer identifier.
+  # ---------------------------------------------------------------
+  validation:
+    min_samples: 2
+    min_features: 1
+    require_no_nan: true
+    require_no_inf: true
+    require_all_numeric: true
+    exclude_customer_id_from_features: true
+
+  # ---------------------------------------------------------------
+  # Compare-experiments display policy (per OQ-EVAL-04, 05, 06).
+  # emit_singleton_group=true: a single evaluation is still surfaced
+  #   under a singleton group rather than raising an error.
+  # show_provenance_per_row=true: every comparison row carries
+  #   clustering_id, algorithm, n_samples_used_for_compute, noise_count,
+  #   noise_ratio, noise_policy_used (mandatory per R-EVAL-14 and §9.3).
+  # disclaimer_text: exact phrase "no ranking, recommendation, or winner
+  #   annotation is emitted" is the single allowed occurrence of those
+  #   substrings in DEV-05 output (R-EVAL-08 / R-EVAL-15).
+  # ---------------------------------------------------------------
+  compare:
+    emit_singleton_group: true
+    show_provenance_per_row: true
+    disclaimer_text: "no ranking, recommendation, or winner annotation is emitted"
